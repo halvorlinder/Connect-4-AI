@@ -4,7 +4,7 @@ use std::fmt::Formatter;
 use std::ops::Add;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum Player{
+pub enum Player{
     P1,
     P2
 }
@@ -25,7 +25,7 @@ pub struct Move {
 
 #[derive(Clone)]
 pub struct GameState {
-    turn: Player,
+    pub(crate) turn: Player,
     board: Vec<Vec<Disc>>,
     rows: usize,
     cols: usize
