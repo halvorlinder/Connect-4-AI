@@ -10,8 +10,8 @@ pub enum Player{
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum Result {
-    Player(Player),
+pub enum GameResult {
+    Win(Player),
     Draw
 }
 
@@ -94,12 +94,12 @@ pub fn get_legal (gs : &GameState) -> Vec<Move> {
     (0..gs.cols).map(|mov| ( legal_in_col(gs.clone(), mov) )).flatten().collect()
 }
 
-pub fn result(gs : &GameState) -> Option<Result>{
+pub fn result(gs : &GameState) -> Option<GameResult>{
     let tests: Vec<fn(&GameState, Player) -> bool> = vec![win_in_row, win_in_col, win_in_diag_tl_to_br, win_in_diag_tr_to_bl];
     for p in vec![Player::P1, Player::P2]{
         for f in &tests{
             if f(&gs, p){
-                return Some(Result::Player(p));
+                return Some(GameResult::Win(p));
             }
         }
     }

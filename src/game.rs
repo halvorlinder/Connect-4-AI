@@ -1,5 +1,5 @@
 use std::io;
-use crate::game_logic::{play, GameState, Move, get_legal, Player, result, Result};
+use crate::game_logic::{play, GameState, Move, get_legal, Player, result, GameResult};
 use rand::prelude::*;
 
 pub struct Game {
@@ -27,7 +27,7 @@ impl Game {
         };
     }
 
-    fn next(&mut self) -> Option<Result>{
+    fn next(&mut self) -> Option<GameResult>{
         let mov = match self.gs.turn{
             Player::P1 => {&self.player_1}
             Player::P2 => {&self.player_2}
@@ -36,7 +36,7 @@ impl Game {
         return result(&self.gs);
     }
 
-    fn game_over(&self, res : Result){
+    fn game_over(&self, res : GameResult){
         println!("{:}", self.gs);
         println!("The game ended with the following result {:?}", res)
     }
