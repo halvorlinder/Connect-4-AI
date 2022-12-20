@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::fmt;
 use std::fmt::Formatter;
 use std::ops::Add;
@@ -138,11 +139,41 @@ fn win_in_col(gs : &GameState, player : Player) -> bool{
 }
 
 fn win_in_diag_tl_to_br(gs : &GameState, player : Player) -> bool{
-    false
+    let starts_side : Vec<(usize, usize)> = (0..gs.rows-3).map(|start_row| (start_row, 0)).collect();
+    let starts_top : Vec<(usize, usize)> = (0..gs.cols-3).map(|start_col| (0, start_col)).collect();
+    for ( start_row, start_col ) in [starts_side, starts_top].concat() {
+        let mut in_a_row = 0;
+        for offset in 0..min::<usize>(gs.rows-start_row, gs.cols-start_col) {
+            match gs.board[start_row+offset][start_col + offset] {
+                Some(p) if p==player => {in_a_row +=1}
+                _ => {in_a_row = 0}
+            }
+            if in_a_row == 4{
+                return true;
+            }
+        }
+
+    }
+    return false;
 }
 
 fn win_in_diag_tr_to_bl(gs : &GameState, player : Player) -> bool{
-    false
+    let starts_side : Vec<(usize, usize)> = (0..gs.rows-3).map(|start_row| (start_row, gs.cols-1)).collect();
+    let starts_top : Vec<(usize, usize)> = (3..gs.cols).map(|start_col| (0, start_col)).collect();
+    for ( start_row, start_col ) in [starts_side, starts_top].concat() {
+        let mut in_a_row = 0;
+        for offset in 0..min::<usize>(gs.rows-start_row, start_col) {
+            match gs.board[start_row+offset][start_col - offset] {
+                Some(p) if p==player => {in_a_row +=1}
+                _ => {in_a_row = 0}
+            }
+            if in_a_row == 4{
+                return true;
+            }
+        }
+
+    }
+    return false;
 }
 
 fn eval (gs : GameState) -> f32{
