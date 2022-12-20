@@ -214,8 +214,8 @@ fn win_in_diag_tr_to_bl(gs : &GameState, player : Player, possible_wins : bool) 
     return wins;
 }
 
-fn eval (gs : GameState) -> f32{
-    num_wins(&gs, gs.turn, true) as f32
+pub fn eval (gs : &GameState) -> f32{
+    num_wins(gs, gs.turn, true) as f32
 }
 
 fn num_wins(gs : &GameState, player : Player, possible_wins : bool ) -> i32 {
