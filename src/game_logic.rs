@@ -1,7 +1,18 @@
+use std::borrow::Borrow;
 use std::cmp::min;
 use std::fmt;
 use std::fmt::Formatter;
 use std::ops::Add;
+
+macro_rules!vec2d {
+    [ $( [ $( $d:expr ),* ] ),* ] => {
+        vec![
+            $(
+                vec![$($d),*],
+            )*
+        ]
+    }
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Player{
@@ -36,6 +47,19 @@ impl GameState {
         Self {
             turn : Player::P1,
             board : vec![vec![None ; 7] ; 6],
+            rows : 6,
+            cols : 7,
+        }
+    }
+    pub fn new_from_board(raw_board: Vec<Vec<i8>>) -> Self {
+        let board : Vec<Vec<Disc>>  = raw_board.iter().map(|row| row.iter().map(|n| match n {
+            1 => Some(Player::P1),
+            2 => Some(Player::P2),
+            _ => None
+        }).collect()).collect();
+        Self {
+            turn : Player::P1,
+            board,
             rows : 6,
             cols : 7,
         }
@@ -103,7 +127,12 @@ pub fn result(gs : &GameState) -> Option<GameResult>{
             }
         }
     }
-    return None
+
+    return if is_full(gs) {Some(GameResult::Draw)}else {None};
+}
+
+fn is_full(gs : &GameState) -> bool{
+    !gs.board.iter().flatten().any(|disc| disc.is_none())
 }
 
 fn win_in_row(gs : &GameState, player : Player) -> bool{
@@ -178,4 +207,209 @@ fn win_in_diag_tr_to_bl(gs : &GameState, player : Player) -> bool{
 
 fn eval (gs : GameState) -> f32{
     0.0
+}
+
+fn num_wins(gs : &GameState, player : Player, possible_wins : bool ) {
+
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::game_logic::{GameResult, GameState, Player, result};
+
+    #[test]
+    fn win_check_horizontal() {
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,1,1,1,1],
+                [0,0,1,2,0,0,0],
+                [0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0],
+                [2,0,0,0,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,0,0,0,0],
+                [0,0,1,2,0,0,0],
+                [0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0],
+                [1,1,1,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,1,1,1,0],
+                [1,2,2,2,2,0,0],
+                [0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0],
+                [0,1,1,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P2)));
+    }
+    #[test]
+    fn win_check_vertical() {
+        let gs = GameState::new_from_board(
+            vec2d![
+                [1,0,0,0,0,0,0],
+                [1,0,1,2,0,0,0],
+                [1,0,0,0,0,0,0],
+                [1,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0],
+                [2,0,0,0,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,0,0,0,0],
+                [0,0,1,2,0,0,0],
+                [0,0,0,0,0,0,1],
+                [0,0,0,0,0,0,1],
+                [0,0,0,0,0,0,1],
+                [1,1,0,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,1,1,1,0],
+                [1,2,2,0,2,0,0],
+                [0,0,2,0,0,0,0],
+                [0,0,2,0,0,0,0],
+                [0,0,2,0,0,0,0],
+                [0,1,1,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P2)));
+    }
+    #[test]
+    fn win_check_diag_tl_to_br() {
+        let gs = GameState::new_from_board(
+            vec2d![
+                [1,0,0,0,0,0,0],
+                [0,1,1,2,0,0,0],
+                [1,0,1,0,0,0,0],
+                [1,0,0,1,0,0,0],
+                [0,0,0,0,0,0,0],
+                [2,0,0,0,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,0,0,0,0],
+                [0,0,2,2,0,0,0],
+                [0,0,0,1,0,0,1],
+                [0,0,0,0,1,0,1],
+                [0,0,0,0,0,1,0],
+                [1,1,0,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,1,1,1,0],
+                [1,2,2,0,2,0,0],
+                [1,0,2,0,0,0,0],
+                [0,1,0,0,0,0,0],
+                [0,0,1,0,0,0,0],
+                [0,1,1,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,1,1,1,0],
+                [1,2,2,0,1,0,0],
+                [1,0,2,0,0,1,0],
+                [0,1,0,0,0,0,1],
+                [0,0,0,0,0,0,0],
+                [0,1,0,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+    }
+    #[test]
+    fn win_check_diag_tr_to_bl() {
+        let gs = GameState::new_from_board(
+            vec2d![
+                [1,0,0,0,0,0,1],
+                [0,1,1,2,0,1,0],
+                [1,0,0,0,1,0,0],
+                [1,0,0,1,0,0,0],
+                [0,0,0,0,0,0,0],
+                [2,0,0,0,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,0,0,0,0],
+                [0,0,2,2,0,0,0],
+                [0,0,0,1,0,0,1],
+                [0,0,1,0,0,0,0],
+                [0,1,0,0,0,1,0],
+                [1,1,0,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,1,0,1,0],
+                [1,2,2,0,2,0,0],
+                [1,0,2,0,0,0,1],
+                [0,0,0,0,0,1,0],
+                [0,0,1,0,1,0,0],
+                [0,1,0,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,0,0,1,0,1,0],
+                [1,2,1,0,0,0,0],
+                [1,1,2,0,0,1,0],
+                [1,1,0,0,0,0,1],
+                [0,0,0,0,0,0,0],
+                [0,1,0,1,0,0,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Win(Player::P1)));
+    }
+
+    #[test]
+    fn draw() {
+        let gs = GameState::new_from_board(
+            vec2d![
+                [2,1,2,1,1,2,1],
+                [2,1,1,2,1,2,1],
+                [1,2,1,2,1,1,2],
+                [1,2,1,1,2,1,2],
+                [1,2,2,1,2,2,1],
+                [2,1,1,1,2,2,1]
+            ]
+        );
+        assert_eq!(result(&gs), Some(GameResult::Draw));
+    }
+    #[test]
+    fn no_result() {
+        let gs = GameState::new_from_board(
+            vec2d![
+                [0,1,2,1,1,2,1],
+                [2,1,1,2,1,2,1],
+                [1,2,1,2,1,1,2],
+                [1,2,1,1,2,1,2],
+                [1,2,2,1,2,2,1],
+                [2,1,1,1,2,2,1]
+            ]
+        );
+        assert_eq!(result(&gs), None);
+    }
 }
