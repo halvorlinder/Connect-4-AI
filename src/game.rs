@@ -1,6 +1,8 @@
 use std::io;
-use crate::game_logic::{play, GameState, Move, get_legal, Player, result, GameResult};
+use crate::game_logic::{play, GameState, Move, get_legal, Player, result, GameResult, eval};
 use rand::prelude::*;
+use rulinalg::utils;
+use rulinalg::utils::argmax;
 
 pub struct Game {
     gs: GameState,
@@ -13,12 +15,12 @@ impl Game {
         Self {
             gs : GameState::new(),
             player_1 : Box::new(Human::new()),
-            player_2 : Box::new(Human::new()),
+            player_2 : Box::new(MinMaxAgent::new()),
         }
     }
 
     fn play(&mut self, mov: Move) -> bool {
-        return match play(mov, self.gs.clone()) {
+        return match play(mov, &self.gs){
             None => false,
             Some(gs) => {
                 self.gs = gs;
@@ -97,5 +99,21 @@ impl Agent for RandomMover {
         let moves = get_legal(&gs);
         let mut rng = rand::thread_rng();
         return moves[rng.gen_range(0..moves.len())]
+    }
+}
+
+struct MinMaxAgent {}
+impl MinMaxAgent {
+    pub fn new() -> Self {
+        Self {
+        }
+    }
+}
+impl Agent for MinMaxAgent {
+    fn next_move(&self, gs: &GameState) -> Move {
+        let moves = get_legal(&gs);
+        let states : Vec<GameState>= moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
+        let utilities : Vec<f32> = states.iter().map(|state| eval(state)).collect();
+        moves[argmax(&utilities).0]
     }
 }

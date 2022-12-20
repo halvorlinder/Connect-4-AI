@@ -87,7 +87,7 @@ fn next_turn(p:Player) -> Player{
     }
 }
 
-pub fn play(mov : Move, gs : GameState) -> Option<GameState> {
+pub fn play(mov : Move, gs : &GameState) -> Option<GameState> {
     let Move {row, col} = mov;
     return match gs.board[row][col] {
         None => {
@@ -230,7 +230,7 @@ fn num_wins(gs : &GameState, player : Player, possible_wins : bool ) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::game_logic::{GameResult, GameState, Player, result};
+    use crate::game_logic::{eval, GameResult, GameState, Player, result};
 
     #[test]
     fn win_check_horizontal() {
