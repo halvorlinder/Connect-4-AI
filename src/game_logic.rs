@@ -63,19 +63,19 @@ fn next_turn(p:Player) -> Player{
     }
 }
 
-pub fn play(mov : Move, gs : GameState) -> GameState {
+pub fn play(mov : Move, gs : GameState) -> Option<GameState> {
     let Move {row, col} = mov;
-    match gs.board[row][col] {
+    return match gs.board[row][col] {
         None => {
-            if row != gs.rows -1 && gs.board[row+1][col].is_none(){
-               panic!("Illegal disc placement")
+            if row != gs.rows - 1 && gs.board[row + 1][col].is_none() {
+                return None;
             }
             let mut copy = gs.clone();
             copy.board[row][col] = Some(gs.turn);
             copy.turn = next_turn(gs.turn);
-            return copy;
+            Some(copy)
         }
-        _ => {panic!("Illegal disc placement")}
+        _ => { None }
     }
 
 }
