@@ -119,15 +119,12 @@ pub fn get_legal (gs : &GameState) -> Vec<Move> {
 }
 
 pub fn result(gs : &GameState) -> Option<GameResult>{
-    let tests: Vec<fn(&GameState, Player) -> bool> = vec![win_in_row, win_in_col, win_in_diag_tl_to_br, win_in_diag_tr_to_bl];
     for p in vec![Player::P1, Player::P2]{
-        for f in &tests{
-            if f(&gs, p){
-                return Some(GameResult::Win(p));
-            }
+        match num_wins(gs, p, false){
+            0 => {}
+            _ => {return Some(GameResult::Win(p))}
         }
     }
-
     return if is_full(gs) {Some(GameResult::Draw)}else {None};
 }
 
@@ -135,39 +132,46 @@ fn is_full(gs : &GameState) -> bool{
     !gs.board.iter().flatten().any(|disc| disc.is_none())
 }
 
-fn win_in_row(gs : &GameState, player : Player) -> bool{
+fn win_in_row(gs : &GameState, player : Player, possible_wins : bool) -> i32{
+    let mut wins = 0;
     for row in 0..gs.rows {
         let mut in_a_row = 0;
         for col in 0..gs.cols {
             match gs.board[row][col] {
                 Some(p) if p==player => {in_a_row +=1}
+                None if possible_wins => {in_a_row +=1}
                 _ => {in_a_row = 0}
             }
             if in_a_row == 4{
-                return true;
+                wins+=1;
+                in_a_row = 3;
             }
         }
     }
-    return false;
+    return wins;
 }
 
-fn win_in_col(gs : &GameState, player : Player) -> bool{
+fn win_in_col(gs : &GameState, player : Player, possible_wins : bool) -> i32{
+    let mut wins = 0;
     for col in 0..gs.cols {
         let mut in_a_row = 0;
         for row in 0..gs.rows {
             match gs.board[row][col] {
                 Some(p) if p==player => {in_a_row +=1}
+                None if possible_wins => {in_a_row +=1}
                 _ => {in_a_row = 0}
             }
             if in_a_row == 4{
-                return true;
+                wins+=1;
+                in_a_row = 3;
             }
         }
     }
-    return false;
+    return wins;
 }
 
-fn win_in_diag_tl_to_br(gs : &GameState, player : Player) -> bool{
+fn win_in_diag_tl_to_br(gs : &GameState, player : Player, possible_wins : bool) -> i32{
+    let mut wins = 0;
     let starts_side : Vec<(usize, usize)> = (0..gs.rows-3).map(|start_row| (start_row, 0)).collect();
     let starts_top : Vec<(usize, usize)> = (0..gs.cols-3).map(|start_col| (0, start_col)).collect();
     for ( start_row, start_col ) in [starts_side, starts_top].concat() {
@@ -175,18 +179,21 @@ fn win_in_diag_tl_to_br(gs : &GameState, player : Player) -> bool{
         for offset in 0..min::<usize>(gs.rows-start_row, gs.cols-start_col) {
             match gs.board[start_row+offset][start_col + offset] {
                 Some(p) if p==player => {in_a_row +=1}
+                None if possible_wins => {in_a_row +=1}
                 _ => {in_a_row = 0}
             }
             if in_a_row == 4{
-                return true;
+                wins+=1;
+                in_a_row = 3;
             }
         }
 
     }
-    return false;
+    return wins;
 }
 
-fn win_in_diag_tr_to_bl(gs : &GameState, player : Player) -> bool{
+fn win_in_diag_tr_to_bl(gs : &GameState, player : Player, possible_wins : bool) -> i32{
+    let mut wins = 0;
     let starts_side : Vec<(usize, usize)> = (0..gs.rows-3).map(|start_row| (start_row, gs.cols-1)).collect();
     let starts_top : Vec<(usize, usize)> = (3..gs.cols).map(|start_col| (0, start_col)).collect();
     for ( start_row, start_col ) in [starts_side, starts_top].concat() {
@@ -194,23 +201,31 @@ fn win_in_diag_tr_to_bl(gs : &GameState, player : Player) -> bool{
         for offset in 0..min::<usize>(gs.rows-start_row, start_col + 1) {
             match gs.board[start_row+offset][start_col - offset] {
                 Some(p) if p==player => {in_a_row +=1}
+                None if possible_wins => {in_a_row +=1}
                 _ => {in_a_row = 0}
             }
             if in_a_row == 4{
-                return true;
+                wins+=1;
+                in_a_row = 3;
             }
         }
 
     }
-    return false;
+    return wins;
 }
 
 fn eval (gs : GameState) -> f32{
-    0.0
+    num_wins(&gs, gs.turn, true) as f32
 }
 
-fn num_wins(gs : &GameState, player : Player, possible_wins : bool ) {
+fn num_wins(gs : &GameState, player : Player, possible_wins : bool ) -> i32 {
+    let tests: Vec<fn(&GameState, Player, bool) -> i32> = vec![win_in_row, win_in_col, win_in_diag_tl_to_br, win_in_diag_tr_to_bl];
+    let mut wins = 0;
+    for f in &tests{
+        wins += f(&gs, player, possible_wins);
+    }
 
+    return wins;
 }
 
 #[cfg(test)]
