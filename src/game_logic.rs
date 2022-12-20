@@ -162,7 +162,7 @@ fn win_in_diag_tr_to_bl(gs : &GameState, player : Player) -> bool{
     let starts_top : Vec<(usize, usize)> = (3..gs.cols).map(|start_col| (0, start_col)).collect();
     for ( start_row, start_col ) in [starts_side, starts_top].concat() {
         let mut in_a_row = 0;
-        for offset in 0..min::<usize>(gs.rows-start_row, start_col) {
+        for offset in 0..min::<usize>(gs.rows-start_row, start_col + 1) {
             match gs.board[start_row+offset][start_col - offset] {
                 Some(p) if p==player => {in_a_row +=1}
                 _ => {in_a_row = 0}
