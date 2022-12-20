@@ -173,7 +173,7 @@ fn win_in_col(gs : &GameState, player : Player, possible_wins : bool) -> i32{
 fn win_in_diag_tl_to_br(gs : &GameState, player : Player, possible_wins : bool) -> i32{
     let mut wins = 0;
     let starts_side : Vec<(usize, usize)> = (0..gs.rows-3).map(|start_row| (start_row, 0)).collect();
-    let starts_top : Vec<(usize, usize)> = (0..gs.cols-3).map(|start_col| (0, start_col)).collect();
+    let starts_top : Vec<(usize, usize)> = (1..gs.cols-3).map(|start_col| (0, start_col)).collect();
     for ( start_row, start_col ) in [starts_side, starts_top].concat() {
         let mut in_a_row = 0;
         for offset in 0..min::<usize>(gs.rows-start_row, gs.cols-start_col) {
@@ -195,7 +195,7 @@ fn win_in_diag_tl_to_br(gs : &GameState, player : Player, possible_wins : bool) 
 fn win_in_diag_tr_to_bl(gs : &GameState, player : Player, possible_wins : bool) -> i32{
     let mut wins = 0;
     let starts_side : Vec<(usize, usize)> = (0..gs.rows-3).map(|start_row| (start_row, gs.cols-1)).collect();
-    let starts_top : Vec<(usize, usize)> = (3..gs.cols).map(|start_col| (0, start_col)).collect();
+    let starts_top : Vec<(usize, usize)> = (3..gs.cols-1).map(|start_col| (0, start_col)).collect();
     for ( start_row, start_col ) in [starts_side, starts_top].concat() {
         let mut in_a_row = 0;
         for offset in 0..min::<usize>(gs.rows-start_row, start_col + 1) {
