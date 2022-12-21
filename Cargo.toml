@@ -9,3 +9,5 @@ edition = "2021"
 
 rand = "0.8.4"
 rulinalg = "0.4.2"
+strum = "0.24.1"
+strum_macros = "0.24.3"

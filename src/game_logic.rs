@@ -20,10 +20,33 @@ pub enum Player{
     P2
 }
 
+impl fmt::Display for Player {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let string  =
+            match self{
+                (Player::P1) => "\u{001b}[31mP1\u{001b}[0m",
+                (Player::P2) => "\u{001b}[33mP2\u{001b}[0m",
+                _ => {""}
+            };
+        write!(f, "{}", string)
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum GameResult {
     Win(Player),
     Draw
+}
+
+impl fmt::Display for GameResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let string  =
+            match self{
+                GameResult::Draw => "\u{001b}[34mDraw\u{001b}[0m".to_string(),
+                GameResult::Win(player) => format!("{}", player)
+            };
+        write!(f, "{}", string)
+    }
 }
 
 type Disc = Option<Player>;
@@ -71,9 +94,9 @@ impl fmt::Display for GameState {
         let string : String = "+".to_string().add(&"-".repeat(self.cols)).add("+").add("\n|") + &self.board.iter()
             .map(|row| row.iter().map(|disc|
             match disc{
-                None => " ",
-                Some(Player::P1) => "O",
-                Some(Player::P2) => "X"
+                None => "\u{001b}[34m.\u{001b}[0m",
+                Some(Player::P1) => "\u{001b}[31mO\u{001b}[0m",
+                Some(Player::P2) => "\u{001b}[33mO\u{001b}[0m"
             }
         ).collect::<Vec<&str>>().join("")).collect::<Vec<String>>().join("|\n|").add("|\n").add("+").add(&"-".repeat(self.cols).add("+").add("\n"));
         write!(f, "{}", string)

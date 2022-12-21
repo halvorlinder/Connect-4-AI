@@ -4,6 +4,9 @@ use rand::prelude::*;
 use rulinalg::utils;
 use rulinalg::utils::argmax;
 
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+
 pub struct Game {
     gs: GameState,
     player_1: Box<dyn Agent>,
@@ -11,11 +14,27 @@ pub struct Game {
 }
 
 impl Game {
+
+    fn generate_agent(player : Player) -> Box<dyn Agent> {
+        println!("Please select agent type for {:}", player);
+        let agent_types : Vec<Agents> = Agents::iter().collect();
+        Game::display_agent_options(&agent_types);
+        let index = get_int_in_range_from_user(0, agent_types.len());
+        let agent = agent_types[index];
+        <dyn Agent>::new(agent)
+    }
+
+    fn display_agent_options(options : &Vec<Agents>){
+        for (i, option) in options.into_iter().enumerate(){
+            println!("{:}: {:?}", i, option)
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             gs : GameState::new(),
-            player_1 : Box::new(Human::new()),
-            player_2 : Box::new(MinMaxAgent::new()),
+            player_1 : Game::generate_agent(Player::P1),
+            player_2 : Game::generate_agent(Player::P2),
         }
     }
 
@@ -40,7 +59,7 @@ impl Game {
 
     fn game_over(&self, res : GameResult){
         println!("{:}", self.gs);
-        println!("The game ended with the following result {:?}", res)
+        println!("The game ended with the following result: {:}", res)
     }
 
     fn game_loop(&mut self){
@@ -57,11 +76,29 @@ impl Game {
     }
 }
 
-trait Agent {
+pub trait Agent {
     fn next_move(&self, gs: &GameState) -> Move;
 }
 
-struct Human {}
+impl dyn Agent {
+    pub fn new(agent_type : Agents) -> Box<dyn Agent> {
+        let agent : Box<dyn Agent> = (match agent_type {
+            Agents::Human => Box::new(Human::new()),
+            Agents::RandomMover => Box::new(RandomMover::new()),
+            Agents::MinMaxAgent => Box::new(MinMaxAgent::new()),
+        });
+        agent
+    }
+}
+
+#[derive(EnumIter, Debug, Eq, PartialEq, Clone, Copy)]
+pub enum Agents {
+    Human,
+    RandomMover,
+    MinMaxAgent,
+}
+
+pub struct Human {}
 
 impl Human {
     pub fn new() -> Self {
@@ -73,21 +110,40 @@ impl Agent for Human {
     fn next_move(&self, gs: &GameState) -> Move {
         let moves = get_legal(&gs);
         println!("{:?}", moves);
-        loop {
-            let mut input_line = String::new();
-            println!("{:?} to move. Select a move from the list", gs.turn);
-            io::stdin()
-                .read_line(&mut input_line)
-                .expect("Failed to read line");
-            let index : usize = input_line.trim().parse().expect("Input not an integer");
-            if index >=0 && index < moves.len(){
-                return moves[index]
-            }
-        }
+        println!("{:} to move. Select a move from the list", gs.turn);
+        moves[get_int_in_range_from_user(0, moves.len())]
     }
 }
 
-struct RandomMover {}
+fn get_int_in_range_from_user(lower : usize, upper : usize)-> usize{
+    fn print_illegal() {
+        println!("Illegal input!");
+    }
+    loop {
+        let mut input_line = String::new();
+        let res = io::stdin()
+            .read_line(&mut input_line);
+        match res{
+            Err(_) => {
+                print_illegal();
+                continue
+            },
+            _ => {}
+        }
+        let index_res : Result<usize, _> = input_line.trim().parse();
+        match index_res {
+            Ok(i) if i >=lower && i < upper => { return i }
+            _ => {
+                print_illegal();
+                continue
+            },
+        };
+    }
+
+}
+
+pub struct RandomMover {}
+
 impl RandomMover {
     pub fn new() -> Self {
         Self {
@@ -102,13 +158,14 @@ impl Agent for RandomMover {
     }
 }
 
-struct MinMaxAgent {}
+pub struct MinMaxAgent {}
 impl MinMaxAgent {
     pub fn new() -> Self {
         Self {
         }
     }
 }
+
 impl Agent for MinMaxAgent {
     fn next_move(&self, gs: &GameState) -> Move {
         let moves = get_legal(&gs);
