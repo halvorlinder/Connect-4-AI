@@ -71,18 +71,36 @@ impl Human {
 }
 impl Agent for Human {
     fn next_move(&self, gs: &GameState) -> Move {
+        fn print_illegal() {
+            println!("Illegal input!");
+        }
         let moves = get_legal(&gs);
         println!("{:?}", moves);
+        println!("{:} to move. Select a move from the list", gs.turn);
         loop {
             let mut input_line = String::new();
-            println!("{:} to move. Select a move from the list", gs.turn);
-            io::stdin()
-                .read_line(&mut input_line)
-                .expect("Failed to read line");
-            let index : usize = input_line.trim().parse().expect("Input not an integer");
+            let res = io::stdin()
+                .read_line(&mut input_line);
+            match res{
+                Err(_) => {
+                    print_illegal();
+                    continue
+                },
+                _ => {}
+            }
+            let index_res : Result<usize, _> = input_line.trim().parse();
+            let mut index = 0;
+            match index_res {
+                Err(_) => {
+                    print_illegal();
+                    continue
+                },
+                Ok(i) => { index = i }
+            }
             if index >=0 && index < moves.len(){
                 return moves[index]
             }
+            print_illegal();
         }
     }
 }
