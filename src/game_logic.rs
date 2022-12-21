@@ -71,9 +71,9 @@ impl fmt::Display for GameState {
         let string : String = "+".to_string().add(&"-".repeat(self.cols)).add("+").add("\n|") + &self.board.iter()
             .map(|row| row.iter().map(|disc|
             match disc{
-                None => " ",
-                Some(Player::P1) => "O",
-                Some(Player::P2) => "X"
+                None => "\u{001b}[34m.\u{001b}[0m",
+                Some(Player::P1) => "\u{001b}[31mO\u{001b}[0m",
+                Some(Player::P2) => "\u{001b}[33mO\u{001b}[0m"
             }
         ).collect::<Vec<&str>>().join("")).collect::<Vec<String>>().join("|\n|").add("|\n").add("+").add(&"-".repeat(self.cols).add("+").add("\n"));
         write!(f, "{}", string)
