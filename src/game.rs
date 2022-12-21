@@ -40,7 +40,7 @@ impl Game {
 
     fn game_over(&self, res : GameResult){
         println!("{:}", self.gs);
-        println!("The game ended with the following result {:?}", res)
+        println!("The game ended with the following result: {:}", res)
     }
 
     fn game_loop(&mut self){
@@ -75,7 +75,7 @@ impl Agent for Human {
         println!("{:?}", moves);
         loop {
             let mut input_line = String::new();
-            println!("{:?} to move. Select a move from the list", gs.turn);
+            println!("{:} to move. Select a move from the list", gs.turn);
             io::stdin()
                 .read_line(&mut input_line)
                 .expect("Failed to read line");
