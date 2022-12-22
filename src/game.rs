@@ -2,7 +2,7 @@ use std::io;
 use crate::game_logic::{play, GameState, Move, get_legal, Player, result, GameResult, eval};
 use rand::prelude::*;
 use rulinalg::utils;
-use rulinalg::utils::argmax;
+use rulinalg::utils::{argmax, argmin};
 
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -164,13 +164,35 @@ impl MinMaxAgent {
         Self {
         }
     }
+
+    fn min_max(&self, gs: &GameState, depth : i8, max_node : bool) -> f32 {
+        let e = eval(gs);
+        match e {
+            f32::INFINITY => f32::INFINITY,
+            f32::NEG_INFINITY => f32::NEG_INFINITY,
+            _ =>
+                match depth {
+                    0 => eval(gs),
+                    d => {
+                        let moves = get_legal(&gs);
+                        let states : Vec<GameState>= moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
+                        let utilities : Vec<f32> = states.iter().map(|state| self.min_max(state, d-1, !max_node)).collect();
+                        utilities.iter().cloned().fold(if gs.turn==Player::P1 { f32::NEG_INFINITY } else {f32::INFINITY}, if gs.turn==Player::P1 { f32::max } else {f32::min})
+                    }
+                }
+        }
+
+
+    }
 }
 
 impl Agent for MinMaxAgent {
     fn next_move(&self, gs: &GameState) -> Move {
         let moves = get_legal(&gs);
         let states : Vec<GameState>= moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
-        let utilities : Vec<f32> = states.iter().map(|state| eval(state)).collect();
-        moves[argmax(&utilities).0]
+        let utilities : Vec<f32> = states.iter().map(|state| self.min_max(state, 4, gs.turn==Player::P1)).collect();
+        // println!("{:?}", moves);
+        // println!("{:?}", utilities);
+        moves[(if gs.turn == Player::P1 { argmax } else {argmin} )(&utilities).0]
     }
 }
