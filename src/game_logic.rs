@@ -91,7 +91,7 @@ impl GameState {
 
 impl fmt::Display for GameState {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let string : String = "+".to_string().add(&"-".repeat(self.cols)).add("+").add("\n|") + &self.board.iter()
+        let string : String = format!("To play : {:}\n", self.turn).add("+").add(&"-".repeat(self.cols)).add("+").add("\n|") + &self.board.iter()
             .map(|row| row.iter().map(|disc|
             match disc{
                 None => "\u{001b}[34m.\u{001b}[0m",
