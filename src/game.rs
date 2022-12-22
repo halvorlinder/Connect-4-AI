@@ -7,6 +7,9 @@ use rulinalg::utils::{argmax, argmin};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
+use std::time::Duration;
+use cpu_time::ProcessTime;
+
 pub struct Game {
     gs: GameState,
     player_1: Box<dyn Agent>,
@@ -115,10 +118,11 @@ impl Agent for Human {
     }
 }
 
+fn print_illegal() {
+    println!("Illegal input!");
+}
+
 fn get_int_in_range_from_user(lower : usize, upper : usize)-> usize{
-    fn print_illegal() {
-        println!("Illegal input!");
-    }
     loop {
         let mut input_line = String::new();
         let res = io::stdin()
@@ -139,7 +143,30 @@ fn get_int_in_range_from_user(lower : usize, upper : usize)-> usize{
             },
         };
     }
+}
 
+fn get_bool_from_user()-> bool{
+    loop {
+        let mut input_line = String::new();
+        let res = io::stdin()
+            .read_line(&mut input_line);
+        match res{
+            Err(_) => {
+                print_illegal();
+                continue
+            },
+            _ => {}
+        }
+        let bool_res : Result<char, _> = input_line.trim().parse();
+        match bool_res {
+            Ok(c) if c.to_ascii_uppercase()=='Y'  => { return true }
+            Ok(c) if c.to_ascii_uppercase()=='N'  => { return false }
+            _ => {
+                print_illegal();
+                continue
+            },
+        };
+    }
 }
 
 pub struct RandomMover {}
@@ -150,6 +177,7 @@ impl RandomMover {
         }
     }
 }
+
 impl Agent for RandomMover {
     fn next_move(&self, gs: &GameState) -> Move {
         let moves = get_legal(&gs);
@@ -158,14 +186,44 @@ impl Agent for RandomMover {
     }
 }
 
-pub struct MinMaxAgent {}
+pub struct MinMaxAgent {
+    timed : bool,
+    time : i32,
+    depth : i32,
+}
+
 impl MinMaxAgent {
+
+    fn get_time_settings() -> (bool, i32) {
+        println!("Should the agent use a timer? (Y/N)");
+        let timed = get_bool_from_user();
+        println!("Maximum number of seconds for a move [1,600]:");
+        let time = match timed {
+            true => {get_int_in_range_from_user(1 , 601)},
+            false => {0}
+        } as i32;
+        (timed, time)
+    }
+
+    fn get_depth_setting() -> i32 {
+        println!("Maximum search depth [1,10]:");
+        get_int_in_range_from_user(1 , 11) as i32
+    }
+
     pub fn new() -> Self {
+        let (timed, time) = MinMaxAgent::get_time_settings();
+        let depth = match timed {
+            true => 0,
+            false => MinMaxAgent::get_depth_setting()
+        };
         Self {
+            timed,
+            time,
+            depth,
         }
     }
 
-    fn min_max(&self, gs: &GameState, depth : i8, max_node : bool) -> f32 {
+    fn min_max(&self, gs: &GameState, depth : i32, max_node : bool) -> f32 {
         let e = eval(gs);
         match e {
             f32::INFINITY => f32::INFINITY,
@@ -187,12 +245,34 @@ impl MinMaxAgent {
 }
 
 impl Agent for MinMaxAgent {
+    //TODO stop search when a winning move is found
+    //TODO keep calculations from last move
+    //TODO prune non promising branches
+    //TODO prune alpha beta
+
     fn next_move(&self, gs: &GameState) -> Move {
-        let moves = get_legal(&gs);
-        let states : Vec<GameState>= moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
-        let utilities : Vec<f32> = states.iter().map(|state| self.min_max(state, 4, gs.turn==Player::P1)).collect();
-        // println!("{:?}", moves);
-        // println!("{:?}", utilities);
-        moves[(if gs.turn == Player::P1 { argmax } else {argmin} )(&utilities).0]
+        let next_move_internal = |depth: i32| -> Move {
+            let moves = get_legal(&gs);
+            let states : Vec<GameState>= moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
+            let utilities : Vec<f32> = states.iter().map(|state| self.min_max(state, depth, gs.turn==Player::P1)).collect();
+            // println!("{:?}", moves);
+            // println!("{:?}", utilities);
+            moves[(if gs.turn == Player::P1 { argmax } else {argmin} )(&utilities).0]
+        };
+        if !self.timed {
+            return next_move_internal(self.depth);
+        }
+
+        let mut depth = 1;
+        let mut mov : Move = next_move_internal(0);
+
+        let start = ProcessTime::try_now().expect("Getting process time failed");
+
+        while  start.try_elapsed().expect("Getting process time failed").as_millis() < ((self.time * 1000) / 7) as u128 {
+            mov = next_move_internal(depth);
+            depth+=1;
+        }
+        println!("Depth: {:?}", depth);
+        mov
     }
 }
