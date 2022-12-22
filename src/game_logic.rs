@@ -238,7 +238,12 @@ fn win_in_diag_tr_to_bl(gs : &GameState, player : Player, possible_wins : bool) 
 }
 
 pub fn eval (gs : &GameState) -> f32{
-    num_wins(gs, gs.turn, true) as f32
+    match result(gs) {
+        Some(GameResult::Win(p)) if p == Player::P1 => f32::INFINITY,
+        Some(GameResult::Win(p)) if p == Player::P2 => f32::NEG_INFINITY,
+        Some(GameResult::Draw) => 0.0,
+        _ => (num_wins(gs, Player::P1, true) - num_wins(gs, Player::P2, true))  as f32
+    }
 }
 
 fn num_wins(gs : &GameState, player : Player, possible_wins : bool ) -> i32 {
