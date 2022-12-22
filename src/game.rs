@@ -216,35 +216,42 @@ impl MinMaxAgent {
         Self { timed, time, depth }
     }
 
-    fn min_max(&self, gs: &GameState, depth: i32, max_node: bool) -> f32 {
+    fn min_max(&self, gs: &GameState, depth: i32, mut alpha: f32, mut beta: f32) -> f32 {
         let e = eval(gs);
+        let (is_max, selector, base_value): (bool, fn(f32, f32) -> (f32), f32) = if gs.turn == Player::P1 {
+            (true, f32::max, f32::NEG_INFINITY)
+        } else {
+            (false, f32::min, f32::INFINITY)
+        };
         match e {
             f32::INFINITY => f32::INFINITY,
             f32::NEG_INFINITY => f32::NEG_INFINITY,
             _ => match depth {
                 0 => eval(gs),
-                d => {
+                depth => {
                     let moves = get_legal(&gs);
                     let states: Vec<GameState> =
                         moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
-                    let utilities: Vec<f32> = states
-                        .iter()
-                        .map(|state| self.min_max(state, d - 1, !max_node))
-                        .collect();
-                    utilities.iter().cloned().fold(
-                        if gs.turn == Player::P1 {
-                            f32::NEG_INFINITY
-                        } else {
-                            f32::INFINITY
-                        },
-                        if gs.turn == Player::P1 {
-                            f32::max
-                        } else {
-                            f32::min
-                        },
-                    )
+                    let mut utilities = Vec::with_capacity(moves.len());
+                    for state in states {
+                        let value = self.min_max(&state, depth - 1, alpha, beta);
+                        utilities.push(value);
+                        if is_max{
+                            alpha = f32::max(alpha, value);
+                            if alpha > beta{
+                                return alpha
+                            }
+                        }
+                        else{
+                            beta = f32::min(beta, value);
+                            if beta < alpha{
+                                return beta
+                            }
+                        }
+                    }
+                    utilities.iter().cloned().fold(base_value, selector)
                 }
-            },
+            }
         }
     }
 }
@@ -253,24 +260,33 @@ impl Agent for MinMaxAgent {
     //TODO stop search when a winning move is found
     //TODO keep calculations from last move
     //TODO prune non promising branches
-    //TODO prune alpha beta
 
     fn next_move(&self, gs: &GameState) -> Move {
         let next_move_internal = |depth: i32| -> Move {
+            let (arg_select, base_value): (fn(&[f32]) -> (usize, f32), f32) =
+                if gs.turn == Player::P1 {
+                    (argmax, f32::NEG_INFINITY)
+                } else {
+                    (argmin, f32::NEG_INFINITY)
+                };
+            let mut alpha: f32 = f32::NEG_INFINITY;
+            let mut beta: f32 = f32::INFINITY;
+
             let moves = get_legal(&gs);
             let states: Vec<GameState> = moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
-            let utilities: Vec<f32> = states
-                .iter()
-                .map(|state| self.min_max(state, depth, gs.turn == Player::P1))
-                .collect();
+
+            let mut utilities = Vec::with_capacity(moves.len());
+
+            for state in states {
+                let value = self.min_max(&state, depth, alpha, beta);
+                utilities.push(value);
+                alpha = f32::min(alpha, value);
+                beta = f32::max(beta, value);
+            }
             // println!("{:?}", moves);
             // println!("{:?}", utilities);
-            moves[(if gs.turn == Player::P1 {
-                argmax
-            } else {
-                argmin
-            })(&utilities)
-            .0]
+            println!("{:?}", utilities);
+            moves[(arg_select)(&utilities).0]
         };
         if !self.timed {
             return next_move_internal(self.depth);
