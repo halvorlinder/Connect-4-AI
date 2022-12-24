@@ -610,4 +610,36 @@ mod tests {
         ]);
         assert_eq!(eval(&gs), 0.0);
     }
+    #[test]
+    fn fast_eval_function() {
+        let padded_gs = PaddedGameState::new();
+        assert_eq!(eval(&padded_gs.gs), 0.0);
+        assert_eq!(fast_eval(&padded_gs, Move{row:5,col:0}), eval(&play(Move{row:5,col:0}, &padded_gs.gs).unwrap()));
+        let padded_gs = PaddedGameState::new_from_board(
+            vec2d![
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [1, 2, 0, 0, 0, 0, 0],
+            [1, 2, 0, 0, 0, 0, 0],
+            [1, 2, 0, 0, 0, 0, 0]
+        ]
+        );
+        assert_eq!(fast_eval(&padded_gs, Move{row:2,col:0}), f32::INFINITY);
+        assert_eq!(fast_result(&padded_gs, Move{row:2,col:0}), Some(GameResult::Win(Player::P1)));
+        for mov in get_legal(&padded_gs.gs){
+            assert_eq!(fast_eval(&padded_gs, mov), eval(&play(mov, &padded_gs.gs).unwrap()));
+        }
+    }
+
+    #[test]
+    fn fast_eval_function_loop() {
+        let states = get_random_positions(42, 1000);
+        for gs in states{
+            let padded_gs = PaddedGameState::new_from_game_state(gs);
+            for mov in get_legal(&padded_gs.gs){
+                assert_eq!(fast_eval(&padded_gs, mov), eval(&play(mov, &padded_gs.gs).unwrap()));
+            }
+        }
+    }
 }
