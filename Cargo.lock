@@ -29,7 +29,9 @@ name = "four-in-a-row"
 version = "0.1.0"
 dependencies = [
  "cpu-time",
+ "num-integer",
  "rand",
+ "rand_chacha",
  "rulinalg",
  "strum",
  "strum_macros",

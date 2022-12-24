@@ -292,7 +292,33 @@ fn num_wins(gs: &GameState, player: Player, possible_wins: bool) -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::game_logic::{eval, result, GameResult, GameState, Player};
+    use rand::Rng;
+    use crate::game_logic::{eval, result, GameResult, GameState, Player, fast_eval, Move, fast_num_wins, play, num_wins, PaddedGameState, fast_result, get_legal, next_turn};
+    use rand_chacha::ChaCha8Rng;
+    use rand_chacha::rand_core::SeedableRng;
+
+    fn get_random_positions(depth : i32, n : usize) -> Vec<GameState> {
+        let mut rng = ChaCha8Rng::seed_from_u64(1);
+        let mut positions = Vec::with_capacity(n);
+        for i in 0..n {
+            positions.push(get_random_position(rng.gen_range(1..depth), i));
+        }
+        positions
+    }
+
+    fn get_random_position(depth : i32, seed : usize) -> GameState {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed as u64);
+        let mut gs = GameState::new();
+        for _ in 0..depth{
+            let moves = get_legal(&gs);
+            let next_gs = play(moves[rng.gen_range(0..moves.len())], &gs).unwrap();
+            if let Some(_) = result(&next_gs){
+                return gs;
+            }
+            gs = next_gs;
+        }
+        gs
+    }
 
     #[test]
     fn win_check_horizontal() {
