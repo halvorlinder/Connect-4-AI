@@ -1,8 +1,10 @@
 use std::borrow::Borrow;
-use std::cmp::min;
-use std::fmt;
+use std::cmp::{max, min};
+use std::{fmt, usize};
 use std::fmt::Formatter;
 use std::ops::Add;
+
+use num_integer::Integer;
 
 macro_rules!vec2d {
     [ $( [ $( $d:expr ),* ] ),* ] => {
@@ -55,6 +57,35 @@ pub struct Move {
     col: usize,
 }
 
+pub struct PaddedGameState{
+    gs : GameState,
+    eval: f32,
+    placed : usize,
+}
+
+impl PaddedGameState {
+    pub fn new() -> Self {
+        Self {
+            gs : GameState::new(),
+            eval : 0.0,
+            placed : 0
+        }
+    }
+    pub fn new_from_board(raw_board: Vec<Vec<i8>>) -> Self {
+        let gs = GameState::new_from_board(raw_board);
+        Self::new_from_game_state(gs)
+    }
+    pub fn new_from_game_state(gs : GameState) -> Self {
+        let eval = eval(&gs);
+        let placed = placed_discs(&gs);
+        Self {
+            gs,
+            eval,
+            placed,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct GameState {
     pub(crate) turn: Player,
@@ -85,8 +116,9 @@ impl GameState {
                     .collect()
             })
             .collect();
+        let placed = placed_discs_board(&board);
         Self {
-            turn: Player::P1,
+            turn: if placed.is_even() {Player::P1} else {Player::P2},
             board,
             rows: 6,
             cols: 7,
@@ -181,6 +213,14 @@ fn is_full(gs: &GameState) -> bool {
     !gs.board.iter().flatten().any(|disc| disc.is_none())
 }
 
+fn placed_discs(gs: &GameState) -> usize {
+    placed_discs_board(&gs.board)
+}
+
+fn placed_discs_board(board : &Vec<Vec<Disc>> ) -> usize {
+    board.iter().flatten().filter(|disc| disc.is_some()).count()
+}
+
 fn win_in_row(gs: &GameState, player: Player, possible_wins: bool) -> i32 {
     let mut wins = 0;
     for row in 0..gs.rows {
@@ -273,6 +313,62 @@ pub fn eval(gs: &GameState) -> f32 {
         Some(GameResult::Draw) => 0.0,
         _ => (num_wins(gs, Player::P1, true) - num_wins(gs, Player::P2, true)) as f32,
     }
+}
+
+pub fn fast_eval(padded_gs : &PaddedGameState, mov : Move) -> f32{
+    let PaddedGameState{ gs, eval, placed  } = padded_gs;
+    match fast_result(padded_gs, mov) {
+        Some(GameResult::Win(p)) if p == Player::P1 => f32::INFINITY,
+        Some(GameResult::Win(p)) if p == Player::P2 => f32::NEG_INFINITY,
+        Some(GameResult::Draw) => 0.0,
+        _ => {
+            let change = (fast_num_wins(gs, true, mov)) as f32;
+            eval + if gs.turn == Player::P1 {change} else {-change}
+        },
+    }
+}
+pub fn fast_result(padded_gs : &PaddedGameState, mov : Move) -> Option<GameResult> {
+    let PaddedGameState{ gs, eval, placed  } = padded_gs;
+    let player = gs.turn;
+    match fast_num_wins(gs, false, mov) {
+        0 => {}
+        _ => return Some(GameResult::Win(player)),
+    }
+    return if *placed==gs.rows*gs.cols {
+        Some(GameResult::Draw)
+    } else {
+        None
+    };
+}
+
+pub fn fast_num_wins(pre_gs : &GameState, possible_wins : bool, mov : Move) -> i32{
+    let player = pre_gs.turn;
+    let mut wins = 0;
+    let base_dirs = vec![ 1,-1 ];
+    let dirs  = vec![(0,1), (1,0), (1,1), (1,-1)];
+    let forward_limits : Vec<(i32, i32)> = vec![(100, pre_gs.cols as i32 -1), (pre_gs.rows as i32 -1, 100), (pre_gs.rows as i32 -1, pre_gs.cols as i32 -1), (pre_gs.rows as i32 -1, 0)];
+    let backward_limits : Vec<(i32, i32)> = vec![(100, 0), (0, 100), (0, 0), (0, pre_gs.cols as i32 -1)];
+    let limits : Vec<(&(i32,i32),(i32,i32))> = forward_limits.iter().zip(backward_limits).collect();
+
+    let Move{row: start_row, col: start_col} = mov;
+    for ( (row_dir, col_dir), ( limit_1, limit_2 ) ) in dirs.iter().zip(limits){
+        let mut ranges = Vec::with_capacity(2);
+        for (base_dir, (row_limit, col_limit) ) in base_dirs.iter().zip(vec![*limit_1, limit_2]){
+            let mut range = 0;
+            for offset in 1..(1+min( i32::abs( row_limit - (start_row as i32 * base_dir * row_dir) ), i32::abs(col_limit - (start_col as i32 * base_dir * col_dir)))){
+                // println!("Start : ({:},{:}) Limit : ({:},{:}) Row : {:} + {:} * {:} * {:}, Col : {:} + {:} * {:} * {:}", start_row, start_col, row_limit, col_limit, start_row, offset, row_dir, base_dir, start_col, offset, col_dir, base_dir);
+                match pre_gs.board[( start_row as i32 + row_dir*offset*base_dir ) as usize][( start_col as i32 + col_dir*offset*base_dir ) as usize] {
+                    Some(p) if p == player && !possible_wins || p!=player && possible_wins => range += 1,
+                    None if possible_wins => range += 1,
+                    _ => {break},
+                }
+            }
+            ranges.push(range);
+        }
+        // println!("{:?}",ranges);
+        wins += if possible_wins {max(ranges[0]+ranges[1]-2,0)-max(ranges[0]-3, 0)-max(ranges[1]-3, 0)} else {max(ranges.iter().sum::<i32>()-2, 0)}
+    }
+    wins
 }
 
 fn num_wins(gs: &GameState, player: Player, possible_wins: bool) -> i32 {
