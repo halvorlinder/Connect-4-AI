@@ -14,3 +14,10 @@ strum_macros = "0.24.3"
 cpu-time = "1.0.0"
 num-integer = "0.1.45"
 rand_chacha = "0.3.1"
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "eval"
+harness = false
