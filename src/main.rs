@@ -5,6 +5,6 @@ mod game;
 mod game_logic;
 
 fn main() {
-    let mut game = Game::new();
+    let mut game = Game::new(6, 7);
     game.start_game();
 }

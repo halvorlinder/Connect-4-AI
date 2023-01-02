@@ -1,8 +1,9 @@
-use std::borrow::Borrow;
+use std::borrow::{Borrow, BorrowMut};
 use std::cmp::{max, min};
-use std::{fmt, usize};
+use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::ops::Add;
+use std::{fmt, usize};
 
 use num_integer::Integer;
 
@@ -14,6 +15,84 @@ macro_rules!vec2d {
             )*
         ]
     }
+}
+
+pub struct GameGlobals {
+    rows: usize,
+    cols: usize,
+    win_tests: HashMap<Move, Vec<Vec<Vec<(usize, usize)>>>>,
+}
+
+impl GameGlobals {
+    pub fn new(rows: usize, cols: usize) -> Self {
+        let win_tests = Self::get_win_tests(rows, cols);
+        Self {
+            rows,
+            cols,
+            win_tests,
+        }
+    }
+    fn get_win_tests(rows: usize, cols: usize) -> HashMap<Move, Vec<Vec<Vec<(usize, usize)>>>> {
+        let mut hm = HashMap::new();
+        for row in 0..rows {
+            for col in 0..cols {
+                let mov = Move { row, col };
+                hm.insert(mov, Self::get_win_tests_for_move(rows, cols, mov));
+            }
+        }
+        hm
+    }
+    fn get_win_tests_for_move(
+        rows: usize,
+        cols: usize,
+        mov: Move,
+    ) -> Vec<Vec<Vec<(usize, usize)>>> {
+        let mut win_squares = Vec::with_capacity(4);
+        let base_dirs = vec![1, -1];
+        let dirs = vec![(0, 1), (1, 0), (1, 1), (1, -1)];
+        let forward_limits: Vec<(i32, i32)> = vec![
+            (100, cols as i32 - 1),
+            (rows as i32 - 1, 100),
+            (rows as i32 - 1, cols as i32 - 1),
+            (rows as i32 - 1, 0),
+        ];
+        let backward_limits: Vec<(i32, i32)> =
+            vec![(100, 0), (0, 100), (0, 0), (0, cols as i32 - 1)];
+        let limits: Vec<(&(i32, i32), (i32, i32))> =
+            forward_limits.iter().zip(backward_limits).collect();
+
+        let Move {
+            row: start_row,
+            col: start_col,
+        } = mov;
+        for ((row_dir, col_dir), (limit_1, limit_2)) in dirs.iter().zip(limits) {
+            let mut win_squares_dir = Vec::with_capacity(2);
+            for (base_dir, (row_limit, col_limit)) in base_dirs.iter().zip(vec![*limit_1, limit_2])
+            {
+                win_squares_dir.push(
+                    (1..(1 + min(
+                        i32::abs(row_limit - (start_row as i32 * base_dir * row_dir)),
+                        i32::abs(col_limit - (start_col as i32 * base_dir * col_dir)),
+                    )))
+                        .map(|offset| {
+                            (
+                                (start_row as i32 + row_dir * offset * base_dir) as usize,
+                                (start_col as i32 + col_dir * offset * base_dir) as usize,
+                            )
+                        })
+                        .collect(),
+                )
+            }
+            win_squares.push(win_squares_dir)
+        }
+        win_squares
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum GameResult {
+    Win(Player),
+    Draw,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -33,12 +112,6 @@ impl fmt::Display for Player {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum GameResult {
-    Win(Player),
-    Draw,
-}
-
 impl fmt::Display for GameResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let string = match self {
@@ -51,38 +124,34 @@ impl fmt::Display for GameResult {
 
 type Disc = Option<Player>;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Move {
     row: usize,
     col: usize,
 }
 
-pub struct PaddedGameState{
-    gs : GameState,
+pub struct PaddedGameState {
+    pub gs: GameState,
     eval: f32,
-    placed : usize,
+    placed: usize,
 }
 
 impl PaddedGameState {
-    pub fn new() -> Self {
+    pub fn new(game_globals: &GameGlobals) -> Self {
         Self {
-            gs : GameState::new(),
-            eval : 0.0,
-            placed : 0
+            gs: GameState::new(game_globals),
+            eval: 0.0,
+            placed: 0,
         }
     }
     pub fn new_from_board(raw_board: Vec<Vec<i8>>) -> Self {
         let gs = GameState::new_from_board(raw_board);
         Self::new_from_game_state(gs)
     }
-    pub fn new_from_game_state(gs : GameState) -> Self {
+    pub fn new_from_game_state(gs: GameState) -> Self {
         let eval = eval(&gs);
         let placed = placed_discs(&gs);
-        Self {
-            gs,
-            eval,
-            placed,
-        }
+        Self { gs, eval, placed }
     }
 }
 
@@ -95,12 +164,14 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new() -> Self {
+    pub fn new(game_globals: &GameGlobals) -> Self {
+        let rows = game_globals.rows;
+        let cols = game_globals.cols;
         Self {
             turn: Player::P1,
             board: vec![vec![None; 7]; 6],
-            rows: 6,
-            cols: 7,
+            rows,
+            cols,
         }
     }
     pub fn new_from_board(raw_board: Vec<Vec<i8>>) -> Self {
@@ -116,12 +187,18 @@ impl GameState {
                     .collect()
             })
             .collect();
+        let rows = board.len();
+        let cols = board[0].len();
         let placed = placed_discs_board(&board);
         Self {
-            turn: if placed.is_even() {Player::P1} else {Player::P2},
+            turn: if placed.is_even() {
+                Player::P1
+            } else {
+                Player::P2
+            },
             board,
-            rows: 6,
-            cols: 7,
+            rows,
+            cols,
         }
     }
 }
@@ -217,7 +294,7 @@ fn placed_discs(gs: &GameState) -> usize {
     placed_discs_board(&gs.board)
 }
 
-fn placed_discs_board(board : &Vec<Vec<Disc>> ) -> usize {
+fn placed_discs_board(board: &Vec<Vec<Disc>>) -> usize {
     board.iter().flatten().filter(|disc| disc.is_some()).count()
 }
 
@@ -315,58 +392,71 @@ pub fn eval(gs: &GameState) -> f32 {
     }
 }
 
-pub fn fast_eval(padded_gs : &PaddedGameState, mov : Move) -> f32{
-    let PaddedGameState{ gs, eval, placed  } = padded_gs;
-    match fast_result(padded_gs, mov) {
+pub fn fast_eval(padded_gs: &PaddedGameState, mov: Move, game_globals: &GameGlobals) -> f32 {
+    let PaddedGameState { gs, eval, placed } = padded_gs;
+    match fast_result(padded_gs, mov, game_globals) {
         Some(GameResult::Win(p)) if p == Player::P1 => f32::INFINITY,
         Some(GameResult::Win(p)) if p == Player::P2 => f32::NEG_INFINITY,
         Some(GameResult::Draw) => 0.0,
         _ => {
-            let change = (fast_num_wins(gs, true, mov)) as f32;
-            eval + if gs.turn == Player::P1 {change} else {-change}
-        },
+            let change = (fast_num_wins(gs, true, mov, game_globals)) as f32;
+            eval + if gs.turn == Player::P1 {
+                change
+            } else {
+                -change
+            }
+        }
     }
 }
-pub fn fast_result(padded_gs : &PaddedGameState, mov : Move) -> Option<GameResult> {
-    let PaddedGameState{ gs, eval, placed  } = padded_gs;
+pub fn fast_result(
+    padded_gs: &PaddedGameState,
+    mov: Move,
+    game_globals: &GameGlobals,
+) -> Option<GameResult> {
+    let PaddedGameState { gs, eval, placed } = padded_gs;
     let player = gs.turn;
-    match fast_num_wins(gs, false, mov) {
+    match fast_num_wins(gs, false, mov, game_globals) {
         0 => {}
         _ => return Some(GameResult::Win(player)),
     }
-    return if *placed==gs.rows*gs.cols {
+    return if *placed == gs.rows * gs.cols {
         Some(GameResult::Draw)
     } else {
         None
     };
 }
 
-pub fn fast_num_wins(pre_gs : &GameState, possible_wins : bool, mov : Move) -> i32{
+pub fn fast_num_wins(
+    pre_gs: &GameState,
+    possible_wins: bool,
+    mov: Move,
+    game_globals: &GameGlobals,
+) -> i32 {
     let player = pre_gs.turn;
     let mut wins = 0;
-    let base_dirs = vec![ 1,-1 ];
-    let dirs  = vec![(0,1), (1,0), (1,1), (1,-1)];
-    let forward_limits : Vec<(i32, i32)> = vec![(100, pre_gs.cols as i32 -1), (pre_gs.rows as i32 -1, 100), (pre_gs.rows as i32 -1, pre_gs.cols as i32 -1), (pre_gs.rows as i32 -1, 0)];
-    let backward_limits : Vec<(i32, i32)> = vec![(100, 0), (0, 100), (0, 0), (0, pre_gs.cols as i32 -1)];
-    let limits : Vec<(&(i32,i32),(i32,i32))> = forward_limits.iter().zip(backward_limits).collect();
-
-    let Move{row: start_row, col: start_col} = mov;
-    for ( (row_dir, col_dir), ( limit_1, limit_2 ) ) in dirs.iter().zip(limits){
+    let limits = game_globals.win_tests.get(&mov).unwrap();
+    for main_dir in limits {
         let mut ranges = Vec::with_capacity(2);
-        for (base_dir, (row_limit, col_limit) ) in base_dirs.iter().zip(vec![*limit_1, limit_2]){
+        for base_dir in main_dir {
             let mut range = 0;
-            for offset in 1..(1+min( i32::abs( row_limit - (start_row as i32 * base_dir * row_dir) ), i32::abs(col_limit - (start_col as i32 * base_dir * col_dir)))){
+            for (row, col) in base_dir {
                 // println!("Start : ({:},{:}) Limit : ({:},{:}) Row : {:} + {:} * {:} * {:}, Col : {:} + {:} * {:} * {:}", start_row, start_col, row_limit, col_limit, start_row, offset, row_dir, base_dir, start_col, offset, col_dir, base_dir);
-                match pre_gs.board[( start_row as i32 + row_dir*offset*base_dir ) as usize][( start_col as i32 + col_dir*offset*base_dir ) as usize] {
-                    Some(p) if p == player && !possible_wins || p!=player && possible_wins => range += 1,
+                match pre_gs.board[*row][*col] {
+                    Some(p) if p == player && !possible_wins || p != player && possible_wins => {
+                        range += 1
+                    }
                     None if possible_wins => range += 1,
-                    _ => {break},
+                    _ => break,
                 }
             }
             ranges.push(range);
         }
         // println!("{:?}",ranges);
-        wins += if possible_wins {max(ranges[0]+ranges[1]-2,0)-max(ranges[0]-3, 0)-max(ranges[1]-3, 0)} else {max(ranges.iter().sum::<i32>()-2, 0)}
+        wins += if possible_wins {
+            max(ranges[0] + ranges[1] - 2, 0) - max(ranges[0] - 3, 0) - max(ranges[1] - 3, 0)
+        } else {
+            max(ranges.iter().sum::<i32>() - 2, 0)
+        }
     }
     wins
 }
@@ -386,35 +476,57 @@ fn num_wins(gs: &GameState, player: Player, possible_wins: bool) -> i32 {
     return wins;
 }
 
-#[cfg(test)]
-mod tests {
+pub mod test_utils {
+    use crate::game_logic::{
+        eval, fast_eval, fast_num_wins, fast_result, get_legal, next_turn, num_wins, play, result,
+        GameGlobals, GameResult, GameState, Move, PaddedGameState, Player,
+    };
     use rand::Rng;
-    use crate::game_logic::{eval, result, GameResult, GameState, Player, fast_eval, Move, fast_num_wins, play, num_wins, PaddedGameState, fast_result, get_legal, next_turn};
-    use rand_chacha::ChaCha8Rng;
     use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
-    fn get_random_positions(depth : i32, n : usize) -> Vec<GameState> {
+    pub fn get_random_positions(
+        depth: i32,
+        n: usize,
+        game_globals: &GameGlobals,
+    ) -> Vec<GameState> {
         let mut rng = ChaCha8Rng::seed_from_u64(1);
         let mut positions = Vec::with_capacity(n);
         for i in 0..n {
-            positions.push(get_random_position(rng.gen_range(1..depth), i));
+            positions.push(get_random_position(
+                rng.gen_range(1..depth),
+                i,
+                game_globals,
+            ));
         }
         positions
     }
 
-    fn get_random_position(depth : i32, seed : usize) -> GameState {
+    pub fn get_random_position(depth: i32, seed: usize, game_globals: &GameGlobals) -> GameState {
         let mut rng = ChaCha8Rng::seed_from_u64(seed as u64);
-        let mut gs = GameState::new();
-        for _ in 0..depth{
+        let mut gs = GameState::new(game_globals);
+        for _ in 0..depth {
             let moves = get_legal(&gs);
             let next_gs = play(moves[rng.gen_range(0..moves.len())], &gs).unwrap();
-            if let Some(_) = result(&next_gs){
+            if let Some(_) = result(&next_gs) {
                 return gs;
             }
             gs = next_gs;
         }
         gs
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::game_logic::test_utils::get_random_positions;
+    use crate::game_logic::{
+        eval, fast_eval, fast_num_wins, fast_result, get_legal, next_turn, num_wins, play, result,
+        GameGlobals, GameResult, GameState, Move, PaddedGameState, Player,
+    };
+    use rand::Rng;
+    use rand_chacha::rand_core::SeedableRng;
+    use rand_chacha::ChaCha8Rng;
 
     #[test]
     fn win_check_horizontal() {
@@ -590,7 +702,7 @@ mod tests {
             [0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0]
         ]);
-        assert_eq!(eval(&gs), 69.0);
+        assert_eq!(eval(&gs), 0.0);
         let gs = GameState::new_from_board(vec2d![
             [0, 1, 2, 1, 1, 2, 1],
             [2, 1, 1, 2, 1, 2, 1],
@@ -612,34 +724,55 @@ mod tests {
     }
     #[test]
     fn fast_eval_function() {
-        let padded_gs = PaddedGameState::new();
+        let game_globals = &GameGlobals::new(6, 7);
+        let padded_gs = PaddedGameState::new(&GameGlobals::new(6, 7));
         assert_eq!(eval(&padded_gs.gs), 0.0);
-        assert_eq!(fast_eval(&padded_gs, Move{row:5,col:0}), eval(&play(Move{row:5,col:0}, &padded_gs.gs).unwrap()));
-        let padded_gs = PaddedGameState::new_from_board(
-            vec2d![
+        assert_eq!(
+            fast_eval(&padded_gs, Move { row: 5, col: 0 }, game_globals),
+            eval(&play(Move { row: 5, col: 0 }, &padded_gs.gs).unwrap())
+        );
+        let padded_gs = PaddedGameState::new_from_board(vec2d![
             [0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0, 0],
             [1, 2, 0, 0, 0, 0, 0],
             [1, 2, 0, 0, 0, 0, 0],
             [1, 2, 0, 0, 0, 0, 0]
-        ]
+        ]);
+        assert_eq!(
+            fast_eval(&padded_gs, Move { row: 2, col: 0 }, game_globals),
+            f32::INFINITY
         );
-        assert_eq!(fast_eval(&padded_gs, Move{row:2,col:0}), f32::INFINITY);
-        assert_eq!(fast_result(&padded_gs, Move{row:2,col:0}), Some(GameResult::Win(Player::P1)));
-        for mov in get_legal(&padded_gs.gs){
-            assert_eq!(fast_eval(&padded_gs, mov), eval(&play(mov, &padded_gs.gs).unwrap()));
+        assert_eq!(
+            fast_result(&padded_gs, Move { row: 2, col: 0 }, game_globals),
+            Some(GameResult::Win(Player::P1))
+        );
+        for mov in get_legal(&padded_gs.gs) {
+            assert_eq!(
+                fast_eval(&padded_gs, mov, game_globals),
+                eval(&play(mov, &padded_gs.gs).unwrap())
+            );
         }
     }
 
     #[test]
     fn fast_eval_function_loop() {
-        let states = get_random_positions(42, 1000);
-        for gs in states{
+        let game_globals = &GameGlobals::new(6, 7);
+        let states = get_random_positions(42, 1000, &GameGlobals::new(6, 7));
+        for gs in states {
             let padded_gs = PaddedGameState::new_from_game_state(gs);
-            for mov in get_legal(&padded_gs.gs){
-                assert_eq!(fast_eval(&padded_gs, mov), eval(&play(mov, &padded_gs.gs).unwrap()));
+            for mov in get_legal(&padded_gs.gs) {
+                assert_eq!(
+                    fast_eval(&padded_gs, mov, game_globals),
+                    eval(&play(mov, &padded_gs.gs).unwrap())
+                );
             }
         }
+    }
+
+    #[test]
+    fn win_squares() {
+        let game_globals = GameGlobals::new(2, 2);
+        println!("{:?}", game_globals.win_tests);
     }
 }

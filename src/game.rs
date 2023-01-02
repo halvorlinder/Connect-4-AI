@@ -1,7 +1,10 @@
-use crate::game_logic::{eval, get_legal, play, result, GameResult, GameState, Move, Player};
+use crate::game_logic::{
+    eval, get_legal, play, result, GameGlobals, GameResult, GameState, Move, Player,
+};
 use rand::prelude::*;
 use rulinalg::utils;
 use rulinalg::utils::{argmax, argmin};
+use std::borrow::Borrow;
 use std::io;
 
 use strum::IntoEnumIterator;
@@ -14,6 +17,7 @@ pub struct Game {
     gs: GameState,
     player_1: Box<dyn Agent>,
     player_2: Box<dyn Agent>,
+    game_globals: GameGlobals,
 }
 
 impl Game {
@@ -32,11 +36,13 @@ impl Game {
         }
     }
 
-    pub fn new() -> Self {
+    pub fn new(rows: usize, cols: usize) -> Self {
+        let game_globals = GameGlobals::new(rows, cols);
         Self {
-            gs: GameState::new(),
+            gs: GameState::new(&game_globals),
             player_1: Game::generate_agent(Player::P1),
             player_2: Game::generate_agent(Player::P2),
+            game_globals,
         }
     }
 
@@ -218,11 +224,12 @@ impl MinMaxAgent {
 
     fn min_max(&self, gs: &GameState, depth: i32, mut alpha: f32, mut beta: f32) -> f32 {
         let e = eval(gs);
-        let (is_max, selector, base_value): (bool, fn(f32, f32) -> (f32), f32) = if gs.turn == Player::P1 {
-            (true, f32::max, f32::NEG_INFINITY)
-        } else {
-            (false, f32::min, f32::INFINITY)
-        };
+        let (is_max, selector, base_value): (bool, fn(f32, f32) -> (f32), f32) =
+            if gs.turn == Player::P1 {
+                (true, f32::max, f32::NEG_INFINITY)
+            } else {
+                (false, f32::min, f32::INFINITY)
+            };
         match e {
             f32::INFINITY => f32::INFINITY,
             f32::NEG_INFINITY => f32::NEG_INFINITY,
@@ -236,22 +243,21 @@ impl MinMaxAgent {
                     for state in states {
                         let value = self.min_max(&state, depth - 1, alpha, beta);
                         utilities.push(value);
-                        if is_max{
+                        if is_max {
                             alpha = f32::max(alpha, value);
-                            if alpha > beta{
-                                return alpha
+                            if alpha > beta {
+                                return alpha;
                             }
-                        }
-                        else{
+                        } else {
                             beta = f32::min(beta, value);
-                            if beta < alpha{
-                                return beta
+                            if beta < alpha {
+                                return beta;
                             }
                         }
                     }
                     utilities.iter().cloned().fold(base_value, selector)
                 }
-            }
+            },
         }
     }
 }
