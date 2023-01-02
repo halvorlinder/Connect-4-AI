@@ -1,4 +1,7 @@
-use crate::game_logic::{eval, get_legal, play, result, GameGlobals, GameResult, GameState, Move, Player, PaddedGameState};
+use crate::game_logic::{
+    eval, get_legal, play, result, GameGlobals, GameResult, GameState, Move, PaddedGameState,
+    Player,
+};
 use rand::prelude::*;
 use rulinalg::utils;
 use rulinalg::utils::{argmax, argmin};
@@ -10,6 +13,7 @@ use strum_macros::EnumIter;
 
 use cpu_time::ProcessTime;
 use std::time::Duration;
+use rulinalg::vector::Vector;
 
 pub struct Game {
     gs: GameState,
@@ -90,7 +94,7 @@ pub trait Agent {
 }
 
 impl dyn Agent {
-    pub fn new(agent_type: Agents, rows : usize, cols: usize) -> Box<dyn Agent> {
+    pub fn new(agent_type: Agents, rows: usize, cols: usize) -> Box<dyn Agent> {
         let agent: Box<dyn Agent> = (match agent_type {
             Agents::Human => Box::new(Human::new()),
             Agents::RandomMover => Box::new(RandomMover::new()),
@@ -192,7 +196,7 @@ pub struct MinMaxAgent {
     timed: bool,
     time: i32,
     depth: i32,
-    game_globals : GameGlobals
+    game_globals: GameGlobals,
 }
 
 impl MinMaxAgent {
@@ -212,20 +216,36 @@ impl MinMaxAgent {
         get_int_in_range_from_user(1, 11) as i32
     }
 
-    pub fn new(rows : usize, cols : usize) -> Self {
+    pub fn new(rows: usize, cols: usize) -> Self {
         let (timed, time) = MinMaxAgent::get_time_settings();
         let depth = match timed {
             true => 0,
             false => MinMaxAgent::get_depth_setting(),
         };
-        Self { timed, time, depth, game_globals : GameGlobals::new(rows, cols) }
+        Self {
+            timed,
+            time,
+            depth,
+            game_globals: GameGlobals::new(rows, cols),
+        }
     }
 
-    pub fn new_with_args(timed : bool, time : i32, depth : i32, rows : usize, cols : usize) -> Self{
-        Self {timed, time, depth, game_globals : GameGlobals::new(rows, cols)}
+    pub fn new_with_args(timed: bool, time: i32, depth: i32, rows: usize, cols: usize) -> Self {
+        Self {
+            timed,
+            time,
+            depth,
+            game_globals: GameGlobals::new(rows, cols),
+        }
     }
 
-    fn min_max(&self, padded_gs: &PaddedGameState, depth: i32, mut alpha: f32, mut beta: f32) -> f32 {
+    fn min_max(
+        &self,
+        padded_gs: &PaddedGameState,
+        depth: i32,
+        mut alpha: f32,
+        mut beta: f32,
+    ) -> f32 {
         let e = padded_gs.eval;
         let (is_max, selector, base_value): (bool, fn(f32, f32) -> (f32), f32) =
             if padded_gs.gs.turn == Player::P1 {
@@ -240,8 +260,14 @@ impl MinMaxAgent {
                 0 => padded_gs.eval,
                 depth => {
                     let moves = get_legal(&padded_gs.gs);
-                    let states: Vec<PaddedGameState> =
-                        moves.iter().map(|mov| PaddedGameState::next(padded_gs, *mov, &self.game_globals)).collect();
+                    let mut states: Vec<PaddedGameState> = moves
+                        .iter()
+                        .map(|mov| PaddedGameState::next(padded_gs, *mov, &self.game_globals))
+                        .collect();
+                    states.sort_by(|gs_1, gs_2| match padded_gs.gs.turn {
+                        Player::P1 => gs_2.eval.total_cmp(&gs_1.eval),
+                        Player::P2 => gs_1.eval.total_cmp(&gs_2.eval),
+                    });
                     let mut utilities = Vec::with_capacity(moves.len());
                     for state in states {
                         let value = self.min_max(&state, depth - 1, alpha, beta);
@@ -284,11 +310,21 @@ impl Agent for MinMaxAgent {
             let padded_gs = PaddedGameState::new_from_game_state(gs);
 
             let moves = get_legal(&gs);
-            let states: Vec<PaddedGameState> = moves.iter().map(|mov| PaddedGameState::next(&padded_gs, *mov, &self.game_globals)).collect();
+            let mut states: Vec<PaddedGameState> = moves
+                .iter()
+                .map(|mov| PaddedGameState::next(&padded_gs, *mov, &self.game_globals))
+                .collect();
+
 
             let mut utilities = Vec::with_capacity(moves.len());
 
-            for state in states {
+            let mut zipped_states : Vec<(&PaddedGameState, Move)>= states.iter().zip(moves).collect();
+            zipped_states.sort_by(|(gs_1, _), (gs_2, _)| match gs.turn {
+                Player::P1 => gs_2.eval.total_cmp(&gs_1.eval),
+                Player::P2 => gs_1.eval.total_cmp(&gs_2.eval),
+            });
+
+            for (state, _) in zipped_states.iter() {
                 let value = self.min_max(&state, depth, alpha, beta);
                 utilities.push(value);
                 alpha = f32::min(alpha, value);
@@ -297,7 +333,7 @@ impl Agent for MinMaxAgent {
             // println!("{:?}", moves);
             // println!("{:?}", utilities);
             // println!("{:?}", utilities);
-            moves[(arg_select)(&utilities).0]
+            zipped_states[(arg_select)(&utilities).0].1
         };
         if !self.timed {
             return next_move_internal(self.depth);

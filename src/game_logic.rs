@@ -151,10 +151,22 @@ impl PaddedGameState {
     pub fn new_from_game_state(gs_ref: &GameState) -> Self {
         let eval = eval(gs_ref);
         let placed = placed_discs(&gs_ref);
-        Self { gs : gs_ref.clone(), eval, placed }
+        Self {
+            gs: gs_ref.clone(),
+            eval,
+            placed,
+        }
     }
-    pub fn next(old_gs : &PaddedGameState, mov : Move, game_globals : &GameGlobals) -> PaddedGameState{
-        PaddedGameState{gs : play(mov, &old_gs.gs).unwrap(), eval : fast_eval(old_gs, mov, &game_globals), placed : old_gs.placed+1}
+    pub fn next(
+        old_gs: &PaddedGameState,
+        mov: Move,
+        game_globals: &GameGlobals,
+    ) -> PaddedGameState {
+        PaddedGameState {
+            gs: play(mov, &old_gs.gs).unwrap(),
+            eval: fast_eval(old_gs, mov, &game_globals),
+            placed: old_gs.placed + 1,
+        }
     }
 }
 

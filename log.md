@@ -10,3 +10,5 @@ After introducing game globals, the fast eval time is down to about 115ns.
 Getting the next move from the minmax agent ~ 140 ms without fast eval.
 
 Using fast eval reduced next move to ~ 35 ms.
+
+Sorting the moves reduced it even further to ~ 7 ms.
