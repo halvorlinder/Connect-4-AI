@@ -1,6 +1,4 @@
-use crate::game_logic::{
-    eval, get_legal, play, result, GameGlobals, GameResult, GameState, Move, Player,
-};
+use crate::game_logic::{eval, get_legal, play, result, GameGlobals, GameResult, GameState, Move, Player, PaddedGameState};
 use rand::prelude::*;
 use rulinalg::utils;
 use rulinalg::utils::{argmax, argmin};
@@ -27,7 +25,7 @@ impl Game {
         Game::display_agent_options(&agent_types);
         let index = get_int_in_range_from_user(0, agent_types.len());
         let agent = agent_types[index];
-        <dyn Agent>::new(agent)
+        <dyn Agent>::new(agent, 6, 7)
     }
 
     fn display_agent_options(options: &Vec<Agents>) {
@@ -92,11 +90,11 @@ pub trait Agent {
 }
 
 impl dyn Agent {
-    pub fn new(agent_type: Agents) -> Box<dyn Agent> {
+    pub fn new(agent_type: Agents, rows : usize, cols: usize) -> Box<dyn Agent> {
         let agent: Box<dyn Agent> = (match agent_type {
             Agents::Human => Box::new(Human::new()),
             Agents::RandomMover => Box::new(RandomMover::new()),
-            Agents::MinMaxAgent => Box::new(MinMaxAgent::new()),
+            Agents::MinMaxAgent => Box::new(MinMaxAgent::new(rows, cols)),
         });
         agent
     }
@@ -194,6 +192,7 @@ pub struct MinMaxAgent {
     timed: bool,
     time: i32,
     depth: i32,
+    game_globals : GameGlobals
 }
 
 impl MinMaxAgent {
@@ -213,19 +212,23 @@ impl MinMaxAgent {
         get_int_in_range_from_user(1, 11) as i32
     }
 
-    pub fn new() -> Self {
+    pub fn new(rows : usize, cols : usize) -> Self {
         let (timed, time) = MinMaxAgent::get_time_settings();
         let depth = match timed {
             true => 0,
             false => MinMaxAgent::get_depth_setting(),
         };
-        Self { timed, time, depth }
+        Self { timed, time, depth, game_globals : GameGlobals::new(rows, cols) }
     }
 
-    fn min_max(&self, gs: &GameState, depth: i32, mut alpha: f32, mut beta: f32) -> f32 {
-        let e = eval(gs);
+    pub fn new_with_args(timed : bool, time : i32, depth : i32, rows : usize, cols : usize) -> Self{
+        Self {timed, time, depth, game_globals : GameGlobals::new(rows, cols)}
+    }
+
+    fn min_max(&self, padded_gs: &PaddedGameState, depth: i32, mut alpha: f32, mut beta: f32) -> f32 {
+        let e = padded_gs.eval;
         let (is_max, selector, base_value): (bool, fn(f32, f32) -> (f32), f32) =
-            if gs.turn == Player::P1 {
+            if padded_gs.gs.turn == Player::P1 {
                 (true, f32::max, f32::NEG_INFINITY)
             } else {
                 (false, f32::min, f32::INFINITY)
@@ -234,11 +237,11 @@ impl MinMaxAgent {
             f32::INFINITY => f32::INFINITY,
             f32::NEG_INFINITY => f32::NEG_INFINITY,
             _ => match depth {
-                0 => eval(gs),
+                0 => padded_gs.eval,
                 depth => {
-                    let moves = get_legal(&gs);
-                    let states: Vec<GameState> =
-                        moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
+                    let moves = get_legal(&padded_gs.gs);
+                    let states: Vec<PaddedGameState> =
+                        moves.iter().map(|mov| PaddedGameState::next(padded_gs, *mov, &self.game_globals)).collect();
                     let mut utilities = Vec::with_capacity(moves.len());
                     for state in states {
                         let value = self.min_max(&state, depth - 1, alpha, beta);
@@ -278,8 +281,10 @@ impl Agent for MinMaxAgent {
             let mut alpha: f32 = f32::NEG_INFINITY;
             let mut beta: f32 = f32::INFINITY;
 
+            let padded_gs = PaddedGameState::new_from_game_state(gs);
+
             let moves = get_legal(&gs);
-            let states: Vec<GameState> = moves.iter().map(|mov| play(*mov, gs).unwrap()).collect();
+            let states: Vec<PaddedGameState> = moves.iter().map(|mov| PaddedGameState::next(&padded_gs, *mov, &self.game_globals)).collect();
 
             let mut utilities = Vec::with_capacity(moves.len());
 
@@ -291,7 +296,7 @@ impl Agent for MinMaxAgent {
             }
             // println!("{:?}", moves);
             // println!("{:?}", utilities);
-            println!("{:?}", utilities);
+            // println!("{:?}", utilities);
             moves[(arg_select)(&utilities).0]
         };
         if !self.timed {

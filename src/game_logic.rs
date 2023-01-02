@@ -132,7 +132,7 @@ pub struct Move {
 
 pub struct PaddedGameState {
     pub gs: GameState,
-    eval: f32,
+    pub eval: f32,
     placed: usize,
 }
 
@@ -146,12 +146,15 @@ impl PaddedGameState {
     }
     pub fn new_from_board(raw_board: Vec<Vec<i8>>) -> Self {
         let gs = GameState::new_from_board(raw_board);
-        Self::new_from_game_state(gs)
+        Self::new_from_game_state(&gs)
     }
-    pub fn new_from_game_state(gs: GameState) -> Self {
-        let eval = eval(&gs);
-        let placed = placed_discs(&gs);
-        Self { gs, eval, placed }
+    pub fn new_from_game_state(gs_ref: &GameState) -> Self {
+        let eval = eval(gs_ref);
+        let placed = placed_discs(&gs_ref);
+        Self { gs : gs_ref.clone(), eval, placed }
+    }
+    pub fn next(old_gs : &PaddedGameState, mov : Move, game_globals : &GameGlobals) -> PaddedGameState{
+        PaddedGameState{gs : play(mov, &old_gs.gs).unwrap(), eval : fast_eval(old_gs, mov, &game_globals), placed : old_gs.placed+1}
     }
 }
 
@@ -760,7 +763,7 @@ mod tests {
         let game_globals = &GameGlobals::new(6, 7);
         let states = get_random_positions(42, 1000, &GameGlobals::new(6, 7));
         for gs in states {
-            let padded_gs = PaddedGameState::new_from_game_state(gs);
+            let padded_gs = PaddedGameState::new_from_game_state(&gs);
             for mov in get_legal(&padded_gs.gs) {
                 assert_eq!(
                     fast_eval(&padded_gs, mov, game_globals),
