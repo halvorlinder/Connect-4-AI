@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::ops::Add;
 use std::{fmt, usize};
+use std::hash::{Hash, Hasher};
 
 use num_integer::Integer;
 
@@ -134,6 +135,7 @@ pub struct PaddedGameState {
     pub gs: GameState,
     pub eval: f32,
     placed: usize,
+    pub unsymmetrical_count : i32
 }
 
 impl PaddedGameState {
@@ -142,6 +144,7 @@ impl PaddedGameState {
             gs: GameState::new(game_globals),
             eval: 0.0,
             placed: 0,
+            unsymmetrical_count: 0,
         }
     }
     pub fn new_from_board(raw_board: Vec<Vec<i8>>) -> Self {
@@ -155,6 +158,7 @@ impl PaddedGameState {
             gs: gs_ref.clone(),
             eval,
             placed,
+            unsymmetrical_count : Self::get_unsymmetrical_count(gs_ref),
         }
     }
     pub fn next(
@@ -166,7 +170,28 @@ impl PaddedGameState {
             gs: play(mov, &old_gs.gs).unwrap(),
             eval: fast_eval(old_gs, mov, &game_globals),
             placed: old_gs.placed + 1,
+            unsymmetrical_count : old_gs.unsymmetrical_count + Self::get_unsymmetrical_count_diff(&old_gs.gs, mov)
         }
+    }
+
+    fn get_unsymmetrical_count(gs : &GameState) -> i32 {
+        let mut count = 0;
+        for row in gs.board.iter() {
+            for col in 0..(row.len()/2){
+                if row[col]!=row[row.len()-col-1]{
+                    count+=1;
+                }
+            }
+        }
+        count
+    }
+
+    fn get_unsymmetrical_count_diff(gs : &GameState, mov : Move) -> i32 {
+        if gs.cols.is_odd() && mov.col==gs.cols/2 {0} else if Some(gs.turn) == gs.board[mov.row][gs.cols-mov.col-1] {-1} else {1}
+    }
+
+    pub fn is_symmetrical(&self) -> bool {
+        self.unsymmetrical_count == 0
     }
 }
 
@@ -408,7 +433,7 @@ pub fn eval(gs: &GameState) -> f32 {
 }
 
 pub fn fast_eval(padded_gs: &PaddedGameState, mov: Move, game_globals: &GameGlobals) -> f32 {
-    let PaddedGameState { gs, eval, placed } = padded_gs;
+    let PaddedGameState { gs, eval, placed, unsymmetrical_count} = padded_gs;
     match fast_result(padded_gs, mov, game_globals) {
         Some(GameResult::Win(p)) if p == Player::P1 => f32::INFINITY,
         Some(GameResult::Win(p)) if p == Player::P2 => f32::NEG_INFINITY,
@@ -428,7 +453,7 @@ pub fn fast_result(
     mov: Move,
     game_globals: &GameGlobals,
 ) -> Option<GameResult> {
-    let PaddedGameState { gs, eval, placed } = padded_gs;
+    let PaddedGameState { gs, eval, placed, unsymmetrical_count } = padded_gs;
     let player = gs.turn;
     match fast_num_wins(gs, false, mov, game_globals) {
         0 => {}

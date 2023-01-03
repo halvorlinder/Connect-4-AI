@@ -260,7 +260,10 @@ impl MinMaxAgent {
                 0 => padded_gs.eval,
                 depth => {
                     let moves = get_legal(&padded_gs.gs);
-                    let mut states: Vec<PaddedGameState> = moves
+                    let num_moves = moves.len();
+                    let pruned_moves = if padded_gs.is_symmetrical() {
+                        moves.into_iter().take((num_moves+1)/2).collect()} else {moves};
+                    let mut states: Vec<PaddedGameState> = pruned_moves
                         .iter()
                         .map(|mov| PaddedGameState::next(padded_gs, *mov, &self.game_globals))
                         .collect();
@@ -268,7 +271,7 @@ impl MinMaxAgent {
                         Player::P1 => gs_2.eval.total_cmp(&gs_1.eval),
                         Player::P2 => gs_1.eval.total_cmp(&gs_2.eval),
                     });
-                    let mut utilities = Vec::with_capacity(moves.len());
+                    let mut utilities = Vec::with_capacity(pruned_moves.len());
                     for state in states {
                         let value = self.min_max(&state, depth - 1, alpha, beta);
                         utilities.push(value);
@@ -309,16 +312,19 @@ impl Agent for MinMaxAgent {
 
             let padded_gs = PaddedGameState::new_from_game_state(gs);
 
-            let moves = get_legal(&gs);
-            let mut states: Vec<PaddedGameState> = moves
+            let mut moves = get_legal(&gs);
+
+            let num_moves = moves.len();
+            let pruned_moves = if padded_gs.is_symmetrical() {moves.into_iter().take((num_moves+1)/2).collect()} else {moves};
+            let mut states: Vec<PaddedGameState> = pruned_moves
                 .iter()
                 .map(|mov| PaddedGameState::next(&padded_gs, *mov, &self.game_globals))
                 .collect();
 
 
-            let mut utilities = Vec::with_capacity(moves.len());
+            let mut utilities = Vec::with_capacity(pruned_moves.len());
 
-            let mut zipped_states : Vec<(&PaddedGameState, Move)>= states.iter().zip(moves).collect();
+            let mut zipped_states : Vec<(&PaddedGameState, Move)>= states.iter().zip(pruned_moves).collect();
             zipped_states.sort_by(|(gs_1, _), (gs_2, _)| match gs.turn {
                 Player::P1 => gs_2.eval.total_cmp(&gs_1.eval),
                 Player::P2 => gs_1.eval.total_cmp(&gs_2.eval),

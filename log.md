@@ -12,3 +12,7 @@ Getting the next move from the minmax agent ~ 140 ms without fast eval.
 Using fast eval reduced next move to ~ 35 ms.
 
 Sorting the moves reduced it even further to ~ 7 ms.
+
+## January 3rd
+
+Applying symmetry pruning reduced next move to ~ 3.5ms
