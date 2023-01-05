@@ -16,3 +16,9 @@ Sorting the moves reduced it even further to ~ 7 ms.
 ## January 3rd
 
 Applying symmetry pruning reduced next move to ~ 3.5ms
+
+## January 4th 
+
+Implementing hashing of visited positions did not improve in the benchmark,
+but the benchmark is becoming too shallow, and it only represents one position.  
+It did in general seem promising.

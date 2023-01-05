@@ -198,6 +198,7 @@ version = "0.1.0"
 dependencies = [
  "cpu-time",
  "criterion",
+ "lazy_static",
  "num-integer",
  "rand",
  "rand_chacha",

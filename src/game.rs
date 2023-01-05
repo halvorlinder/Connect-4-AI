@@ -6,6 +6,8 @@ use rand::prelude::*;
 use rulinalg::utils;
 use rulinalg::utils::{argmax, argmin};
 use std::borrow::Borrow;
+use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry;
 use std::io;
 
 use strum::IntoEnumIterator;
@@ -14,6 +16,10 @@ use strum_macros::EnumIter;
 use cpu_time::ProcessTime;
 use std::time::Duration;
 use rulinalg::vector::Vector;
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+// static CALL_COUNT_TO_MIN_MAX: AtomicUsize = AtomicUsize::new(0);
 
 pub struct Game {
     gs: GameState,
@@ -197,6 +203,7 @@ pub struct MinMaxAgent {
     time: i32,
     depth: i32,
     game_globals: GameGlobals,
+    visited : HashMap<GameState, f32>,
 }
 
 impl MinMaxAgent {
@@ -227,6 +234,7 @@ impl MinMaxAgent {
             time,
             depth,
             game_globals: GameGlobals::new(rows, cols),
+            visited : HashMap::new(),
         }
     }
 
@@ -236,6 +244,7 @@ impl MinMaxAgent {
             time,
             depth,
             game_globals: GameGlobals::new(rows, cols),
+            visited : HashMap::new(),
         }
     }
 
@@ -245,7 +254,9 @@ impl MinMaxAgent {
         depth: i32,
         mut alpha: f32,
         mut beta: f32,
+        visited: &mut HashMap<GameState, f32>,
     ) -> f32 {
+        // CALL_COUNT_TO_MIN_MAX.fetch_add(1, Ordering::SeqCst);
         let e = padded_gs.eval;
         let (is_max, selector, base_value): (bool, fn(f32, f32) -> (f32), f32) =
             if padded_gs.gs.turn == Player::P1 {
@@ -253,6 +264,11 @@ impl MinMaxAgent {
             } else {
                 (false, f32::min, f32::INFINITY)
             };
+
+        match visited.entry(padded_gs.gs.to_owned()) {
+            Entry::Occupied(duplicate) => {return *duplicate.get();}
+            Entry::Vacant(_) => {}
+        }
         match e {
             f32::INFINITY => f32::INFINITY,
             f32::NEG_INFINITY => f32::NEG_INFINITY,
@@ -273,7 +289,7 @@ impl MinMaxAgent {
                     });
                     let mut utilities = Vec::with_capacity(pruned_moves.len());
                     for state in states {
-                        let value = self.min_max(&state, depth - 1, alpha, beta);
+                        let value = self.min_max(&state, depth - 1, alpha, beta, visited );
                         utilities.push(value);
                         if is_max {
                             alpha = f32::max(alpha, value);
@@ -287,7 +303,11 @@ impl MinMaxAgent {
                             }
                         }
                     }
-                    utilities.iter().cloned().fold(base_value, selector)
+                    let value = utilities.iter().cloned().fold(base_value, selector);
+
+                    visited.insert(padded_gs.gs.to_owned(), value);
+
+                    value
                 }
             },
         }
@@ -300,6 +320,7 @@ impl Agent for MinMaxAgent {
     //TODO prune non promising branches
 
     fn next_move(&self, gs: &GameState) -> Move {
+        // CALL_COUNT_TO_MIN_MAX.store(0, Ordering::SeqCst);
         let next_move_internal = |depth: i32| -> Move {
             let (arg_select, base_value): (fn(&[f32]) -> (usize, f32), f32) =
                 if gs.turn == Player::P1 {
@@ -311,6 +332,8 @@ impl Agent for MinMaxAgent {
             let mut beta: f32 = f32::INFINITY;
 
             let padded_gs = PaddedGameState::new_from_game_state(gs);
+
+            let mut visited : HashMap<GameState, f32> = HashMap::new();
 
             let mut moves = get_legal(&gs);
 
@@ -331,7 +354,7 @@ impl Agent for MinMaxAgent {
             });
 
             for (state, _) in zipped_states.iter() {
-                let value = self.min_max(&state, depth, alpha, beta);
+                let value = self.min_max(&state, depth, alpha, beta, &mut visited);
                 utilities.push(value);
                 alpha = f32::min(alpha, value);
                 beta = f32::max(beta, value);
@@ -339,6 +362,8 @@ impl Agent for MinMaxAgent {
             // println!("{:?}", moves);
             // println!("{:?}", utilities);
             // println!("{:?}", utilities);
+            // println!("min_max called {} times.", CALL_COUNT_TO_MIN_MAX.load(Ordering::SeqCst));
+            // println!("Utilities {:?}", utilities);
             zipped_states[(arg_select)(&utilities).0].1
         };
         if !self.timed {
@@ -361,5 +386,27 @@ impl Agent for MinMaxAgent {
         }
         println!("Depth: {:?}", depth);
         mov
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::game::{Agent, MinMaxAgent};
+    use crate::game_logic::{GameGlobals, PaddedGameState};
+    use crate::game_logic::test_utils::{get_random_position, get_random_positions};
+
+    #[test]
+    fn min_max_call_count() {
+        let gg = GameGlobals::new(6,7);
+        // let state = get_random_position(42, 0, &gg);
+        let states = get_random_positions(42, 10, &gg);
+        // let padded = PaddedGameState::new_from_game_state(&state);
+        for state in states.iter(){
+            // println!("{}", state);
+            for depth in 7..8 {
+                let agent = MinMaxAgent::new_with_args(false, 0, depth, 6, 7);
+                agent.next_move(&state);
+            }
+        }
+
     }
 }

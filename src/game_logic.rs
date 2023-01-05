@@ -195,7 +195,7 @@ impl PaddedGameState {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct GameState {
     pub(crate) turn: Player,
     board: Vec<Vec<Disc>>,
@@ -240,6 +240,19 @@ impl GameState {
             rows,
             cols,
         }
+    }
+}
+
+impl Hash for GameState {
+    fn hash<H: Hasher>(&self, state: &mut H)
+    where H: std::hash::Hasher{
+        let v : Vec<u8>= self.board.iter().flatten().map(|disc|{
+            match disc {
+                None => {0},
+                Some(p) => if *p==Player::P1{1} else {2}
+            }
+        }).collect();
+        state.write(&v[..])
     }
 }
 
