@@ -22,3 +22,6 @@ Applying symmetry pruning reduced next move to ~ 3.5ms
 Implementing hashing of visited positions did not improve in the benchmark,
 but the benchmark is becoming too shallow, and it only represents one position.  
 It did in general seem promising.
+
+Applying a faster hashing scheme, next move with depth 5, stays about the same.
+At depth 9, however, we see a 50% reduction from ~ 730ms to ~ 380ms.

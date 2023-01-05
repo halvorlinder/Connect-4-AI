@@ -135,7 +135,8 @@ pub struct PaddedGameState {
     pub gs: GameState,
     pub eval: f32,
     placed: usize,
-    pub unsymmetrical_count : i32
+    pub unsymmetrical_count : i32,
+    pub hash : u128,
 }
 
 impl PaddedGameState {
@@ -145,6 +146,7 @@ impl PaddedGameState {
             eval: 0.0,
             placed: 0,
             unsymmetrical_count: 0,
+            hash : 0,
         }
     }
     pub fn new_from_board(raw_board: Vec<Vec<i8>>) -> Self {
@@ -159,6 +161,7 @@ impl PaddedGameState {
             eval,
             placed,
             unsymmetrical_count : Self::get_unsymmetrical_count(gs_ref),
+            hash : Self::calculate_hash(gs_ref)
         }
     }
     pub fn next(
@@ -170,9 +173,34 @@ impl PaddedGameState {
             gs: play(mov, &old_gs.gs).unwrap(),
             eval: fast_eval(old_gs, mov, &game_globals),
             placed: old_gs.placed + 1,
-            unsymmetrical_count : old_gs.unsymmetrical_count + Self::get_unsymmetrical_count_diff(&old_gs.gs, mov)
+            unsymmetrical_count : old_gs.unsymmetrical_count + Self::get_unsymmetrical_count_diff(&old_gs.gs, mov),
+            hash : Self::get_updated_hash(&old_gs.gs, old_gs.hash, mov),
         }
     }
+
+    fn calculate_hash(gs : &GameState) -> u128{
+        let mut hash = 0;
+        for row in 0..gs.rows{
+            for col in 0..gs.cols{
+                let index = 2 * (row * gs.cols + col);
+                match gs.board[row][col] {
+                    None => {}
+                    Some(Player::P1) => {hash |= 1<<index}
+                    Some(Player::P2) => {hash |= 1<<(index+1)}
+                }
+            }
+        }
+        hash
+    }
+
+    fn get_updated_hash(gs : &GameState, old : u128, mov : Move) -> u128{
+                let index = 2 * (mov.row * gs.cols + mov.col);
+                match gs.turn {
+                    Player::P1 => {old | 1<<index}
+                    Player::P2 => {old | 1<<(index+1)}
+                }
+    }
+
 
     fn get_unsymmetrical_count(gs : &GameState) -> i32 {
         let mut count = 0;
@@ -446,7 +474,7 @@ pub fn eval(gs: &GameState) -> f32 {
 }
 
 pub fn fast_eval(padded_gs: &PaddedGameState, mov: Move, game_globals: &GameGlobals) -> f32 {
-    let PaddedGameState { gs, eval, placed, unsymmetrical_count} = padded_gs;
+    let PaddedGameState { gs, eval, placed, unsymmetrical_count, hash} = padded_gs;
     match fast_result(padded_gs, mov, game_globals) {
         Some(GameResult::Win(p)) if p == Player::P1 => f32::INFINITY,
         Some(GameResult::Win(p)) if p == Player::P2 => f32::NEG_INFINITY,
@@ -466,7 +494,7 @@ pub fn fast_result(
     mov: Move,
     game_globals: &GameGlobals,
 ) -> Option<GameResult> {
-    let PaddedGameState { gs, eval, placed, unsymmetrical_count } = padded_gs;
+    let PaddedGameState { gs, eval, placed, unsymmetrical_count, hash} = padded_gs;
     let player = gs.turn;
     match fast_num_wins(gs, false, mov, game_globals) {
         0 => {}
@@ -827,5 +855,23 @@ mod tests {
     fn win_squares() {
         let game_globals = GameGlobals::new(2, 2);
         println!("{:?}", game_globals.win_tests);
+    }
+
+    #[test]
+    fn hash() {
+        let game_globals = GameGlobals::new(6, 7);
+        let padded_gs = PaddedGameState::new_from_board(vec2d![
+            [1, 2, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 1]
+        ]);
+        println!("{:#086b}", padded_gs.hash);
+        println!("{}", padded_gs.hash);
+        let next = PaddedGameState::next(&padded_gs, Move{row: 5, col : 5}, &game_globals);
+        println!("{:#086b}", next.hash);
+        println!("{}", next.hash);
     }
 }

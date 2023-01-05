@@ -41,7 +41,7 @@ fn min_max_next_move_benchmark(c: &mut Criterion) {
     let gs = get_random_position(0, 1, &game_globals);
     let padded_gs = PaddedGameState::new_from_game_state(&gs);
 
-    for depth in [5]{
+    for depth in [5, 9]{
         group.bench_with_input(BenchmarkId::from_parameter(depth), &depth, |b, &depth| {
             let agent = MinMaxAgent::new_with_args(false, 0, depth, 6, 7);
             b.iter(|| agent.next_move(&padded_gs.gs))
@@ -102,6 +102,6 @@ fn u128_hash_insert_benchmark(c: &mut Criterion) {
     });
 }
 
-criterion_group!(hashes, game_state_hash_benchmark, game_state_hash_insert_benchmark, u128_hash_insert_benchmark);
+// criterion_group!(hashes, game_state_hash_benchmark, game_state_hash_insert_benchmark, u128_hash_insert_benchmark);
 
-criterion_main!(evals, next_moves, hashes);
+criterion_main!(evals, next_moves, );

@@ -203,7 +203,6 @@ pub struct MinMaxAgent {
     time: i32,
     depth: i32,
     game_globals: GameGlobals,
-    visited : HashMap<GameState, f32>,
 }
 
 impl MinMaxAgent {
@@ -234,7 +233,6 @@ impl MinMaxAgent {
             time,
             depth,
             game_globals: GameGlobals::new(rows, cols),
-            visited : HashMap::new(),
         }
     }
 
@@ -244,7 +242,6 @@ impl MinMaxAgent {
             time,
             depth,
             game_globals: GameGlobals::new(rows, cols),
-            visited : HashMap::new(),
         }
     }
 
@@ -254,7 +251,7 @@ impl MinMaxAgent {
         depth: i32,
         mut alpha: f32,
         mut beta: f32,
-        visited: &mut HashMap<GameState, f32>,
+        visited: &mut HashMap<u128, f32>,
     ) -> f32 {
         // CALL_COUNT_TO_MIN_MAX.fetch_add(1, Ordering::SeqCst);
         let e = padded_gs.eval;
@@ -265,10 +262,11 @@ impl MinMaxAgent {
                 (false, f32::min, f32::INFINITY)
             };
 
-        match visited.entry(padded_gs.gs.to_owned()) {
+        match visited.entry(padded_gs.hash) {
             Entry::Occupied(duplicate) => {return *duplicate.get();}
             Entry::Vacant(_) => {}
         }
+
         match e {
             f32::INFINITY => f32::INFINITY,
             f32::NEG_INFINITY => f32::NEG_INFINITY,
@@ -305,7 +303,7 @@ impl MinMaxAgent {
                     }
                     let value = utilities.iter().cloned().fold(base_value, selector);
 
-                    visited.insert(padded_gs.gs.to_owned(), value);
+                    visited.insert(padded_gs.hash, value);
 
                     value
                 }
@@ -333,7 +331,7 @@ impl Agent for MinMaxAgent {
 
             let padded_gs = PaddedGameState::new_from_game_state(gs);
 
-            let mut visited : HashMap<GameState, f32> = HashMap::new();
+            let mut visited : HashMap<u128, f32> = HashMap::new();
 
             let mut moves = get_legal(&gs);
 
